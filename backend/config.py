@@ -29,7 +29,7 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 SPEAKERS_FILE = os.path.join(DATA_DIR, "speakers.json")
 
 # Valid commands (extensible)
-VALID_COMMANDS = ["up", "down"]
+VALID_COMMANDS = ["up", "down", "start", "serve", "resume", "pause"]
 
 # Player assignments: speaker name → player number (1 = left, 2 = right)
 PLAYER_ASSIGNMENTS = {

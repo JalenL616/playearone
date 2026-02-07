@@ -188,10 +188,44 @@ class Game {
   start() {
     this.gameLoop();
   }
+
+  // Public method for voice command to start game
+  startGame() {
+    console.log('[Game] startGame() called, current state:', this.gameState);
+    if (this.gameState === 'waiting') {
+      this.ball.reset(this.canvasWidth, this.canvasHeight);
+      this.gameState = 'playing';
+      console.log('[Game] started from waiting');
+    } else if (this.gameState === 'serving') {
+      this.ball.reset(this.canvasWidth, this.canvasHeight, this.serveDirection);
+      this.gameState = 'playing';
+      console.log('[Game] started from serving, direction:', this.serveDirection);
+    } else if (this.gameState === 'paused') {
+      this.gameState = 'playing';
+      console.log('[Game] resumed from paused');
+    } else if (this.gameState === 'gameover') {
+      this.reset();
+      console.log('[Game] reset from gameover');
+    } else {
+      console.log('[Game] startGame() called but state is:', this.gameState);
+    }
+  }
+
+  // Public method for voice command to pause game
+  pauseGame() {
+    console.log('[Game] pauseGame() called, current state:', this.gameState);
+    if (this.gameState === 'playing') {
+      this.gameState = 'paused';
+      console.log('[Game] paused');
+    } else {
+      console.log('[Game] pauseGame() called but state is not playing:', this.gameState);
+    }
+  }
 }
 
 // Scripts are loaded dynamically after DOM is ready, so run immediately
 const game = new Game();
+window.game = game;  // Expose globally for voice commands
 game.start();
 
 const voice = new VoiceInput();

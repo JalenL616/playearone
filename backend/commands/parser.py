@@ -158,6 +158,38 @@ Examples:
                     raw_text=raw_text,
                     confidence=0.85
                 )
+            
+            # "start" often heard as "star", "starts", etc.
+            if text_lower in ["star", "starts", "starting", "started"]:
+                return ParsedCommand(
+                    command="start",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "pause" often heard as "paws", "paused", "pausing", etc.
+            if text_lower in ["paws", "paused", "pausing", "paus", "pos"]:
+                return ParsedCommand(
+                    command="pause",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "serve" often heard as "serves", "serving", "surf", etc.
+            if text_lower in ["serves", "serving", "served", "surf", "serve"]:
+                return ParsedCommand(
+                    command="serve",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "resume" often heard as "resumes", "resuming", etc.
+            if text_lower in ["resumes", "resuming", "resumed", "resume"]:
+                return ParsedCommand(
+                    command="resume",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
 
             # Step 3: Use LLM to parse more complex utterances
             response = self.client.chat.completions.create(

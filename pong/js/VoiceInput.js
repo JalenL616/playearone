@@ -184,6 +184,32 @@ class VoiceInput {
         console.log('[Voice] command:', command, 'player:', player, 'confidence:', confidence);
         if (confidence < 0.5) return;
 
+        // Handle game control commands (start/serve/resume/pause)
+        if (command === 'start' || command === 'serve' || command === 'resume') {
+            console.log('[Voice] start/serve/resume command, gameState:', window.game?.gameState);
+            if (window.game) {
+                window.game.startGame();
+                this.showCommand(player, command);
+                console.log('[Voice] after start/serve/resume, gameState:', window.game.gameState);
+            } else {
+                console.error('[Voice] window.game not available!');
+            }
+            return;
+        }
+        
+        if (command === 'pause') {
+            console.log('[Voice] pause command, gameState:', window.game?.gameState);
+            if (window.game) {
+                window.game.pauseGame();
+                this.showCommand(player, command);
+                console.log('[Voice] after pause, gameState:', window.game.gameState);
+            } else {
+                console.error('[Voice] window.game not available!');
+            }
+            return;
+        }
+
+        // Handle paddle movement commands
         const mapping = this.playerKeys[player];
         if (!mapping) return;
 
