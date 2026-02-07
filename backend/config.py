@@ -8,20 +8,18 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", os.getenv("OPENAI_API_KEY",
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-4o-mini")
 
-# Deepgram API
-DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
-
-# Hugging Face token (required for Pyannote)
-HF_TOKEN = os.getenv("HF_TOKEN", "")
+# Vosk (local speech recognition) - NO CLOUD
+USE_VOSK = True  # Always use local Vosk
+VOSK_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "vosk-model-small-en-us-0.15")
 
 # Audio settings
 SAMPLE_RATE = 16000
 CHANNELS = 1
 CHUNK_DURATION_MS = 500
 
-# Speaker identification
-SPEAKER_SIMILARITY_THRESHOLD = 0.3  # Cosine similarity threshold for speaker matching
-SPEAKER_GAME_THRESHOLD = 0.15  # Lower threshold for active game players
+# Speaker identification (using Resemblyzer - fast local)
+SPEAKER_SIMILARITY_THRESHOLD = 0.40  # Threshold for speaker matching
+SPEAKER_GAME_THRESHOLD = 0.40  # Lower threshold for active game players
 ENROLLMENT_DURATION_SECONDS = 5
 
 # Paths
@@ -44,6 +42,4 @@ VALID_COMMANDS = [
 
 # Player assignments: speaker name → player number (1 = left, 2 = right)
 PLAYER_ASSIGNMENTS = {
-    "Jalen": 1,
-    "UP": 2,
 }

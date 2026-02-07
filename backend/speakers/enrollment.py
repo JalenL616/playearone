@@ -1,50 +1,56 @@
 import numpy as np
 import torch
 from typing import Optional, Tuple
-from pyannote.audio import Model, Inference
+from resemblyzer import VoiceEncoder, preprocess_wav
 import config
 from .storage import SpeakerStorage
 
 
 class SpeakerEnrollment:
-    """Handles voice enrollment for new speakers."""
+    """Handles voice enrollment for new speakers using Resemblyzer (fast, local)."""
 
     def __init__(self, storage: Optional[SpeakerStorage] = None):
         self.storage = storage or SpeakerStorage()
-        self._model = None
-        self._inference = None
+        self._encoder = None
 
     def _load_model(self) -> None:
-        """Lazy load the Pyannote embedding model."""
-        if self._model is None:
-            # Use the speaker embedding model
-            self._model = Model.from_pretrained(
-                "pyannote/wespeaker-voxceleb-resnet34-LM",
-                use_auth_token=config.HF_TOKEN
-            )
-            self._inference = Inference(self._model, window="whole")
+        """Lazy load the Resemblyzer encoder."""
+        if self._encoder is None:
+            print("[Speaker] Loading Resemblyzer encoder...")
+            self._encoder = VoiceEncoder()
+            print("[Speaker] Resemblyzer encoder loaded")
 
     def extract_embedding(self, audio: torch.Tensor, sample_rate: int) -> np.ndarray:
         """
-        Extract speaker embedding from audio.
+        Extract speaker embedding from audio using Resemblyzer.
 
         Args:
-            audio: Torch tensor of shape (channels, samples)
+            audio: Torch tensor of shape (channels, samples) or (samples,)
             sample_rate: Audio sample rate
 
         Returns:
-            Speaker embedding as numpy array
+            Speaker embedding as numpy array (256-dim)
         """
         self._load_model()
 
-        # Pyannote inference expects a dict with waveform and sample_rate
-        audio_dict = {
-            "waveform": audio,
-            "sample_rate": sample_rate
-        }
+        # Convert torch tensor to numpy
+        if isinstance(audio, torch.Tensor):
+            audio_np = audio.numpy()
+        else:
+            audio_np = audio
 
-        embedding = self._inference(audio_dict)
-        return np.array(embedding)
+        # Handle multi-channel audio - take first channel or squeeze
+        if audio_np.ndim == 2:
+            audio_np = audio_np[0]  # Take first channel
+
+        audio_np = audio_np.astype(np.float32)
+
+        # Preprocess for Resemblyzer (resamples to 16kHz if needed)
+        wav = preprocess_wav(audio_np, source_sr=sample_rate)
+
+        # Extract embedding
+        embedding = self._encoder.embed_utterance(wav)
+        return embedding
 
     def enroll(self, name: str, audio: torch.Tensor, sample_rate: int) -> Tuple[bool, str]:
         """
@@ -68,21 +74,25 @@ class SpeakerEnrollment:
             return False, f"Speaker '{name}' already enrolled"
 
         # Check audio duration
-        duration = audio.shape[1] / sample_rate
+        if audio.ndim == 2:
+            duration = audio.shape[1] / sample_rate
+        else:
+            duration = len(audio) / sample_rate
+
         if duration < 2.0:
             return False, "Audio too short. Need at least 2 seconds."
 
         try:
             embedding = self.extract_embedding(audio, sample_rate)
-            
+
             # Debug: check embedding quality
             embedding_norm = np.linalg.norm(embedding)
             print(f"[Enrollment] Speaker: {name}, embedding norm: {embedding_norm:.3f}, shape: {embedding.shape}")
-            
+
             # Normalize the embedding
             if embedding_norm > 0:
                 embedding = embedding / embedding_norm
-            
+
             success = self.storage.add_speaker(name, embedding)
 
             if success:
@@ -91,6 +101,8 @@ class SpeakerEnrollment:
                 return False, f"Failed to save speaker '{name}'"
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return False, f"Enrollment failed: {str(e)}"
 
     def re_enroll(self, name: str, audio: torch.Tensor, sample_rate: int) -> Tuple[bool, str]:
@@ -110,6 +122,12 @@ class SpeakerEnrollment:
 
         try:
             embedding = self.extract_embedding(audio, sample_rate)
+
+            # Normalize
+            embedding_norm = np.linalg.norm(embedding)
+            if embedding_norm > 0:
+                embedding = embedding / embedding_norm
+
             success = self.storage.update_speaker(name, embedding)
 
             if success:

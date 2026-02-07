@@ -38,7 +38,6 @@ class AudioCapture {
             this.source = this.audioContext.createMediaStreamSource(this.stream);
 
             // Create script processor for audio data access
-            // Note: ScriptProcessorNode is deprecated but AudioWorklet requires separate file
             this.processor = this.audioContext.createScriptProcessor(
                 this.bufferSize,
                 1,  // input channels

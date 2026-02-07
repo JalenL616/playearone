@@ -164,6 +164,7 @@ class BoxingVoiceInput {
 
     this.socket.onopen = () => {
       console.log('[BoxingVoice] connected');
+      this.socket.send(JSON.stringify({ type: 'set_mode', mode: 'game' }));
       this.socket.send(JSON.stringify({ type: 'start_listening' }));
       this.updateStatus('connected');
     };
