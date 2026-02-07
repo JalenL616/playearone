@@ -8,8 +8,12 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", os.getenv("OPENAI_API_KEY",
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-4o-mini")
 
-# Deepgram API
+# Deepgram API (fallback, not used when Vosk is enabled)
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
+
+# Vosk (local speech recognition)
+USE_VOSK = True  # Set False to use Deepgram instead
+VOSK_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "vosk-model-small-en-us-0.15")
 
 # Hugging Face token (required for Pyannote)
 HF_TOKEN = os.getenv("HF_TOKEN", "")

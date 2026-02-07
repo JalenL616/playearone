@@ -1,5 +1,6 @@
 import json
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -278,6 +279,8 @@ class WebSocketHandler:
             if self._is_audio_silent(audio):
                 return None
 
+            start_time = time.perf_counter()
+
             # Prepare audio for Pyannote
             audio_tensor, sample_rate = self.audio_processor.prepare_for_pyannote(audio)
 
@@ -289,9 +292,17 @@ class WebSocketHandler:
                 self._parse_command, audio, sample_rate
             )
 
-            # Wait for both results
+            # Wait for both results and measure timing
             speaker_match = speaker_future.result()
+            speaker_time = time.perf_counter() - start_time
+
             parsed = command_future.result()
+            total_time = time.perf_counter() - start_time
+
+            # Log timing
+            print(f"[Timing] Speaker ID: {speaker_time*1000:.0f}ms | "
+                  f"Total (parallel): {total_time*1000:.0f}ms | "
+                  f"Text: '{parsed.raw_text}'")
 
             # Calculate speech duration for this speaker
             speech_duration = self._get_speech_duration(conn_id, speaker_match.name, is_speaking)

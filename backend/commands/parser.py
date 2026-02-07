@@ -1,12 +1,10 @@
 import json
+import time
 from typing import Optional
 from dataclasses import dataclass
 import numpy as np
-from deepgram import DeepgramClient, PrerecordedOptions
 from openai import OpenAI
 import config
-import io
-import wave
 
 
 @dataclass
@@ -17,24 +15,60 @@ class ParsedCommand:
     confidence: float
 
 
-class CommandParser:
-    """Uses Deepgram for transcription and OpenRouter for command extraction."""
+class VoskTranscriber:
+    """Local speech recognition using Vosk."""
 
     def __init__(self):
-        # OpenRouter client
-        self.client = OpenAI(
-            api_key=config.OPENROUTER_API_KEY,
-            base_url=config.OPENROUTER_BASE_URL
-        )
-        self.model = config.LLM_MODEL
-        self.valid_commands = config.VALID_COMMANDS
+        from vosk import Model, KaldiRecognizer
+        import os
 
-        # Deepgram client
+        model_path = config.VOSK_MODEL_PATH
+        if not os.path.exists(model_path):
+            raise RuntimeError(
+                f"Vosk model not found at {model_path}\n"
+                f"Download from: https://alphacephei.com/vosk/models\n"
+                f"Recommended: vosk-model-small-en-us-0.15 (~40MB)"
+            )
+
+        self._model = Model(model_path)
+        self._sample_rate = config.SAMPLE_RATE
+
+    def transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
+        """Transcribe audio using Vosk."""
+        from vosk import KaldiRecognizer
+
+        # Create recognizer for this audio
+        rec = KaldiRecognizer(self._model, sample_rate)
+        rec.SetWords(False)  # Don't need word-level timing
+
+        # Convert float32 [-1, 1] to int16 PCM
+        if audio.dtype == np.float32:
+            audio_int16 = (audio * 32767).astype(np.int16)
+        else:
+            audio_int16 = audio.astype(np.int16)
+
+        # Process audio
+        rec.AcceptWaveform(audio_int16.tobytes())
+
+        # Get final result
+        result = json.loads(rec.FinalResult())
+        return result.get("text", "").strip()
+
+
+class DeepgramTranscriber:
+    """Cloud speech recognition using Deepgram."""
+
+    def __init__(self):
+        from deepgram import DeepgramClient, PrerecordedOptions
+        import io
+        import wave
+
         self.deepgram = DeepgramClient(config.DEEPGRAM_API_KEY)
+        self._io = io
+        self._wave = wave
 
     def _audio_to_wav_bytes(self, audio: np.ndarray, sample_rate: int) -> bytes:
-        """Convert numpy audio array to WAV bytes for Deepgram."""
-        # Ensure float32 normalized to [-1, 1]
+        """Convert numpy audio array to WAV bytes."""
         if audio.dtype != np.float32:
             audio = audio.astype(np.float32)
 
@@ -42,26 +76,24 @@ class CommandParser:
         if max_val > 1.0:
             audio = audio / max_val
 
-        # Convert to 16-bit PCM
         audio_int16 = (audio * 32767).astype(np.int16)
 
-        # Create WAV in memory
-        buffer = io.BytesIO()
-        with wave.open(buffer, 'wb') as wav_file:
+        buffer = self._io.BytesIO()
+        with self._wave.open(buffer, 'wb') as wav_file:
             wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)  # 16-bit
+            wav_file.setsampwidth(2)
             wav_file.setframerate(sample_rate)
             wav_file.writeframes(audio_int16.tobytes())
 
         return buffer.getvalue()
 
-    def _transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
+    def transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
         """Transcribe audio using Deepgram."""
+        from deepgram import PrerecordedOptions
+
         try:
-            # Convert to WAV bytes
             audio_bytes = self._audio_to_wav_bytes(audio, sample_rate)
 
-            # Deepgram options optimized for speed
             options = PrerecordedOptions(
                 model="nova-2",
                 language="en",
@@ -69,19 +101,42 @@ class CommandParser:
                 punctuate=False,
             )
 
-            # Transcribe
             response = self.deepgram.listen.prerecorded.v("1").transcribe_file(
                 {"buffer": audio_bytes, "mimetype": "audio/wav"},
                 options
             )
 
-            # Extract transcript
             transcript = response.results.channels[0].alternatives[0].transcript
             return transcript.strip()
 
         except Exception as e:
             print(f"Deepgram transcription error: {e}")
             return ""
+
+
+class CommandParser:
+    """Uses Vosk or Deepgram for transcription and OpenRouter for command extraction."""
+
+    def __init__(self):
+        # LLM client for flexible command parsing
+        self.client = OpenAI(
+            api_key=config.OPENROUTER_API_KEY,
+            base_url=config.OPENROUTER_BASE_URL
+        )
+        self.model = config.LLM_MODEL
+        self.valid_commands = config.VALID_COMMANDS
+
+        # Initialize transcriber based on config
+        if config.USE_VOSK:
+            print("[CommandParser] Using Vosk (local) for transcription")
+            self._transcriber = VoskTranscriber()
+        else:
+            print("[CommandParser] Using Deepgram (cloud) for transcription")
+            self._transcriber = DeepgramTranscriber()
+
+    def _transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
+        """Transcribe audio using configured transcriber."""
+        return self._transcriber.transcribe(audio, sample_rate)
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt for command extraction."""
@@ -109,20 +164,16 @@ Examples:
     def parse(self, audio: np.ndarray, sample_rate: int) -> ParsedCommand:
         """
         Parse audio to extract command.
-        Uses Deepgram for transcription, then OpenRouter for command parsing.
-
-        Args:
-            audio: Audio as numpy array (float32, normalized to [-1, 1])
-            sample_rate: Audio sample rate
-
-        Returns:
-            ParsedCommand with extracted command details
+        Uses Vosk/Deepgram for transcription, then OpenRouter for command parsing.
         """
         try:
-            # Step 1: Transcribe with Deepgram
+            # Step 1: Transcribe
+            t0 = time.perf_counter()
             raw_text = self._transcribe(audio, sample_rate)
+            transcribe_time = (time.perf_counter() - t0) * 1000
 
             if not raw_text:
+                print(f"[Transcribe] {transcribe_time:.0f}ms (empty)")
                 return ParsedCommand(
                     command=None,
                     raw_text=None,
@@ -136,6 +187,7 @@ Examples:
             # Direct match
             for cmd in self.valid_commands:
                 if text_lower == cmd:
+                    print(f"[Transcribe] {transcribe_time:.0f}ms | Direct match: '{cmd}'")
                     return ParsedCommand(
                         command=cmd,
                         raw_text=raw_text,
@@ -313,6 +365,7 @@ Examples:
                 )
 
             # Step 3: Use LLM to parse more complex utterances
+            t1 = time.perf_counter()
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -328,6 +381,9 @@ Examples:
                 max_tokens=50,
                 temperature=0
             )
+
+            llm_time = (time.perf_counter() - t1) * 1000
+            print(f"[Transcribe] {transcribe_time:.0f}ms | [LLM] {llm_time:.0f}ms | Text: '{raw_text}'")
 
             # Parse response
             result_text = response.choices[0].message.content.strip()
