@@ -155,6 +155,7 @@ class VoiceInput {
 
         this.socket.onopen = () => {
             console.log('[Voice] WebSocket opened');
+            this.socket.send(JSON.stringify({ type: 'set_mode', mode: 'game' }));
             // Send game type on connection
             this.socket.send(JSON.stringify({ 
                 type: 'start_listening',
@@ -381,7 +382,12 @@ class VoiceInput {
 
     async startAudioCapture() {
         this.mediaStream = await navigator.mediaDevices.getUserMedia({
-            audio: { sampleRate: 16000, channelCount: 1 }
+            audio: {
+                sampleRate: 16000,
+                channelCount: 1,
+                echoCancellation: true,
+                noiseSuppression: true
+            }
         });
 
         this.audioContext = new AudioContext({ sampleRate: 16000 });

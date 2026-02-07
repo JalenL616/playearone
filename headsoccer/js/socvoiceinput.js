@@ -1,4 +1,4 @@
-class BoxingVoiceInput {
+class SoccerVoiceInput {
   constructor(game) {
     this.game = game;
     this.socket = null;
@@ -9,45 +9,32 @@ class BoxingVoiceInput {
     this.commandTimers = {};
 
     this.commandMap = {
-      'jab': 'jab', 'left': 'jab',
-      'cross': 'cross', 'right': 'cross',
-      'hook': 'hook',
-      'uppercut': 'uppercut', 'upper': 'uppercut',
-      'block': 'block', 'guard': 'block',
-      'dodge': 'dodge', 'duck': 'dodge',
-      'forward': 'forward', 'advance': 'forward',
-      'back': 'back', 'retreat': 'back',
-      'start': 'start', 'fight': 'start',
-      'pause': 'pause'
+      'left': 'left',
+      'right': 'right',
+      'jump': 'jump', 'up': 'jump',
+      'kick': 'kick', 'shoot': 'kick',
+      'power': 'power', 'special': 'power', 'ability': 'power',
+      'start': 'start', 'play': 'start',
+      'pause': 'pause', 'stop': 'pause'
     };
 
     // Debounce
     this.lastCommand = { 1: null, 2: null };
     this.lastCommandTime = { 1: 0, 2: 0 };
     this.debounceTime = 100;
-    
-    // Voice-triggered hold timers for block/dodge
-    this.voiceHoldTimers = { 1: {}, 2: {} };
-    this.voiceHoldDuration = 1000; // ms to hold block/dodge from voice command
-
-    this.audioQueue = [];
-    this.isNarratorPlaying = false;
-  }
-
-  isVoiceHoldActive(player, action) {
-    return !!this.voiceHoldTimers[player][action];
+    this.volumeDecayTimers = {};
   }
 
   async initialize() {
-    console.log('[BoxingVoice] initialize');
+    console.log('[SoccerVoice] initialize');
     this.enabled = true;
     this.connectWebSocket();
     this.fetchPlayerAssignments();
     try {
       await this.startAudioCapture();
-      console.log('[BoxingVoice] mic active');
+      console.log('[SoccerVoice] mic active');
     } catch (e) {
-      console.error('[BoxingVoice] mic failed:', e);
+      console.error('[SoccerVoice] mic failed:', e);
       this.updateStatus('no-mic');
     }
   }
@@ -76,9 +63,9 @@ class BoxingVoiceInput {
           el.textContent = name.charAt(0).toUpperCase() + name.slice(1);
         }
       }
-      console.log('[BoxingVoice] assignments:', assignments);
+      console.log('[SoccerVoice] assignments:', assignments);
     } catch (e) {
-      console.error('[BoxingVoice] failed to fetch assignments:', e);
+      console.error('[SoccerVoice] failed to fetch assignments:', e);
     }
   }
 
@@ -152,9 +139,9 @@ class BoxingVoiceInput {
 
       // Refresh UI
       this.fetchPlayerAssignments();
-      console.log('[BoxingVoice] player assignments updated:', assignments);
+      console.log('[SoccerVoice] player assignments updated:', assignments);
     } catch (e) {
-      console.error('[BoxingVoice] failed to update player assignment:', e);
+      console.error('[SoccerVoice] failed to update player assignment:', e);
     }
   }
 
@@ -162,26 +149,27 @@ class BoxingVoiceInput {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = location.host || 'localhost:8000';
     const url = `${protocol}//${host}/ws`;
-    console.log('[BoxingVoice] connecting to', url);
+    console.log('[SoccerVoice] connecting to', url);
     this.socket = new WebSocket(url);
 
     this.socket.onopen = () => {
-      console.log('[BoxingVoice] connected');
-      this.socket.send(JSON.stringify({ type: 'set_mode', mode: 'game' }));
-      this.socket.send(JSON.stringify({ 
-        type: 'start_listening',
-        game: 'boxing' 
-      }));
+      console.log('[SoccerVoice] connected');
+      this.socket.send(JSON.stringify({ type: 'start_listening' }));
       this.updateStatus('connected');
     };
 
     this.socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'command') {
-            this.handleVoiceCommand(data.player, data.command, data.command_confidence);
-        } else if (data.type === 'narrator_audio') {
-            this.enqueueNarratorAudio(data.audio);
+      const data = JSON.parse(event.data);
+      if (data.type === 'command') {
+        if (data.player) {
+          this.updateVolumeMeter(data.player, data.volume || 0);
         }
+        if (data.player && data.command) {
+          this.handleVoiceCommand(data.player, data.command, data.command_confidence, data.volume || 0);
+        }
+      } else if (data.type === 'volume' && data.player) {
+        this.updateVolumeMeter(data.player, data.volume || 0);
+      }
     };
 
     this.socket.onclose = () => {
@@ -196,32 +184,7 @@ class BoxingVoiceInput {
     };
   }
 
-  enqueueNarratorAudio(base64Audio) {
-    const audioUrl = `data:audio/mp3;base64,${base64Audio}`;
-    this.audioQueue.push(audioUrl);
-    this.playNextNarratorClip();
-}
-
-playNextNarratorClip() {
-    if (this.isNarratorPlaying || this.audioQueue.length === 0) return;
-
-    this.isNarratorPlaying = true;
-    const url = this.audioQueue.shift();
-    const audio = new Audio(url);
-
-    audio.onended = () => {
-        this.isNarratorPlaying = false;
-        this.playNextNarratorClip();
-    };
-
-    audio.play().catch(e => {
-        console.error("Narrator playback failed", e);
-        this.isNarratorPlaying = false;
-        this.playNextNarratorClip();
-    });
-}
-
-  handleVoiceCommand(player, command, confidence) {
+  handleVoiceCommand(player, command, confidence, volume = 0) {
     if (confidence < 0.65) return;
 
     const action = this.commandMap[command];
@@ -241,40 +204,28 @@ playNextNarratorClip() {
       this.game.startMatch();
     } else if (action === 'pause') {
       this.game.togglePause();
-    } else if (action === 'block' || action === 'dodge') {
-      this.activateVoiceHold(player, action);
     } else {
-      this.game.handleCommand(player, action);
+      this.game.handleCommand(player, action, volume);
     }
 
     this.showCommand(player, action);
   }
-  
-  activateVoiceHold(player, action) {
-    // If already holding this action, don't reset the timer
-    if (this.voiceHoldTimers[player][action]) {
-      return;
+
+  updateVolumeMeter(player, volume) {
+    const el = document.getElementById(`player${player}Volume`);
+    if (!el) return;
+
+    const percentage = Math.round(volume * 100);
+    el.style.bottom = `${percentage}%`;
+
+    if (this.volumeDecayTimers[player]) {
+      clearTimeout(this.volumeDecayTimers[player]);
     }
-    
-    // Start holding
-    this.game.handleCommand(player, action, true);
-    
-    // Set timer to release after duration
-    const startTime = performance.now();
-    const interval = setInterval(() => {
-      const elapsed = performance.now() - startTime;
-      if (elapsed >= this.voiceHoldDuration) {
-        // Release
-        this.game.handleCommand(player, action, false);
-        clearInterval(interval);
-        delete this.voiceHoldTimers[player][action];
-      } else {
-        // Continue holding
-        this.game.handleCommand(player, action, true);
-      }
-    }, 50); // Update every 50ms
-    
-    this.voiceHoldTimers[player][action] = interval;
+
+    this.volumeDecayTimers[player] = setTimeout(() => {
+      el.style.bottom = '0%';
+      delete this.volumeDecayTimers[player];
+    }, 300);
   }
 
   showCommand(player, command) {

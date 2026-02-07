@@ -446,3 +446,120 @@ header h1 {
     opacity: 0.6;
     filter: grayscale(1);
 }
+
+/* Dance Panel Styles */
+.dance-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.dance-header h2 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.dance-header p {
+    color: var(--text-secondary);
+}
+
+.dance-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.btn-icon {
+    margin-right: 0.5rem;
+}
+
+.dance-status {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.status-text {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.status-timer {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--success);
+    margin-bottom: 1rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #333;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), #8BC34A);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#danceCanvas {
+    display: block;
+    margin: 2rem auto;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 2px solid var(--success);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(76, 175, 80, 0.3);
+    max-width: 100%;
+}
+
+.dance-transcript {
+    background: #2a2a3e;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    font-style: italic;
+    color: #aaa;
+    min-height: 40px;
+}
+
+.dance-score {
+    background: #2a2a3e;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.dance-score h3 {
+    text-align: center;
+    margin-bottom: 1rem;
+    color: var(--success);
+}
+
+.score-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #333;
+}
+
+.score-item:last-child {
+    border-bottom: none;
+}
+
+.score-item span:first-child {
+    color: var(--text-secondary);
+}
+
+.score-item span:last-child {
+    color: var(--success);
+    font-weight: bold;
+}
+
+#stopDance:not(:disabled):hover {
+    background: #ff8787 !important;
+}

@@ -1,9 +1,8 @@
 import json
 import time
-from typing import Optional
+from typing import Optional, List
 from dataclasses import dataclass
 import numpy as np
-from openai import OpenAI
 import config
 
 
@@ -16,7 +15,7 @@ class ParsedCommand:
 
 
 class VoskTranscriber:
-    """Local speech recognition using Vosk."""
+    """Local speech recognition using Vosk (fast, no cloud)."""
 
     def __init__(self):
         from vosk import Model, KaldiRecognizer
@@ -30,8 +29,10 @@ class VoskTranscriber:
                 f"Recommended: vosk-model-small-en-us-0.15 (~40MB)"
             )
 
+        print("[Vosk] Loading model...")
         self._model = Model(model_path)
         self._sample_rate = config.SAMPLE_RATE
+        print("[Vosk] Model loaded")
 
     def transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
         """Transcribe audio using Vosk."""
@@ -55,385 +56,141 @@ class VoskTranscriber:
         return result.get("text", "").strip()
 
 
-class DeepgramTranscriber:
-    """Cloud speech recognition using Deepgram."""
-
-    def __init__(self):
-        from deepgram import DeepgramClient, PrerecordedOptions
-        import io
-        import wave
-
-        self.deepgram = DeepgramClient(config.DEEPGRAM_API_KEY)
-        self._io = io
-        self._wave = wave
-
-    def _audio_to_wav_bytes(self, audio: np.ndarray, sample_rate: int) -> bytes:
-        """Convert numpy audio array to WAV bytes."""
-        if audio.dtype != np.float32:
-            audio = audio.astype(np.float32)
-
-        max_val = np.max(np.abs(audio))
-        if max_val > 1.0:
-            audio = audio / max_val
-
-        audio_int16 = (audio * 32767).astype(np.int16)
-
-        buffer = self._io.BytesIO()
-        with self._wave.open(buffer, 'wb') as wav_file:
-            wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(sample_rate)
-            wav_file.writeframes(audio_int16.tobytes())
-
-        return buffer.getvalue()
-
-    def transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
-        """Transcribe audio using Deepgram."""
-        from deepgram import PrerecordedOptions
-
-        try:
-            audio_bytes = self._audio_to_wav_bytes(audio, sample_rate)
-
-            options = PrerecordedOptions(
-                model="nova-2",
-                language="en",
-                smart_format=False,
-                punctuate=False,
-            )
-
-            response = self.deepgram.listen.prerecorded.v("1").transcribe_file(
-                {"buffer": audio_bytes, "mimetype": "audio/wav"},
-                options
-            )
-
-            transcript = response.results.channels[0].alternatives[0].transcript
-            return transcript.strip()
-
-        except Exception as e:
-            print(f"Deepgram transcription error: {e}")
-            return ""
+# Phonetic mappings for common misrecognitions
+PHONETIC_MATCHES = {
+    # "up" variations
+    "yup": "up", "yep": "up", "uh": "up", "uhh": "up", "app": "up", "op": "up",
+    # "down" variations
+    "dawn": "down", "town": "down", "darn": "down",
+    # "start" variations
+    "star": "start", "stars": "start", "starts": "start", "starting": "start", "started": "start",
+    "stark": "start", "store": "start", "story": "start", "stir": "start", "stuart": "start",
+    # "pause" variations
+    "paws": "pause", "paused": "pause", "pausing": "pause", "paus": "pause", "pos": "pause",
+    # "serve" variations
+    "serves": "serve", "serving": "serve", "served": "serve", "surf": "serve",
+    # "resume" variations
+    "resumes": "resume", "resuming": "resume", "resumed": "resume",
+    # "jab" variations
+    "job": "jab", "ja": "jab", "jap": "jab", "jabs": "jab", "jabbed": "jab",
+    # "cross" variations
+    "crawss": "cross", "craw": "cross", "crosses": "cross", "crossed": "cross",
+    # "hook" variations
+    "huk": "hook", "hooked": "hook", "hooking": "hook", "hulk": "hook",
+    # "uppercut" variations
+    "upper": "uppercut", "cut": "uppercut", "upperkat": "uppercut", "upcut": "uppercut", "uppercuts": "uppercut",
+    # "block" variations
+    "blog": "block", "blocked": "block", "blocking": "block", "box": "block", "bloc": "block",
+    # "guard" variations
+    "guarding": "guard", "guarded": "guard",
+    # "dodge" variations
+    "doge": "dodge", "dodged": "dodge", "dodging": "dodge", "dok": "dodge", "dogs": "dodge",
+    # "duck" variations
+    "ducked": "duck", "ducking": "duck", "ducks": "duck",
+    # "forward" variations
+    "for": "forward", "towards": "forward", "forwards": "forward", "forwarded": "forward",
+    # "advance" variations
+    "advancing": "advance", "advanced": "advance", "advances": "advance",
+    # "back" variations
+    "bak": "back", "backwards": "back", "backing": "back", "backed": "back",
+    # "retreat" variations
+    "retreating": "retreat", "retreated": "retreat", "retreats": "retreat",
+    # "left" variations
+    "lefty": "left", "lefts": "left",
+    # "right" variations
+    "righty": "right", "rights": "right",
+    # "fight" variations
+    "fights": "fight", "fighting": "fight", "fighter": "fight",
+}
 
 
 class CommandParser:
-    """Uses Vosk or Deepgram for transcription and OpenRouter for command extraction."""
+    """Parses voice commands using local Vosk transcription."""
 
     def __init__(self):
-        # LLM client for flexible command parsing
-        self.client = OpenAI(
-            api_key=config.OPENROUTER_API_KEY,
-            base_url=config.OPENROUTER_BASE_URL
-        )
-        self.model = config.LLM_MODEL
-        self.valid_commands = config.VALID_COMMANDS
-
-        # Initialize transcriber based on config
-        if config.USE_VOSK:
-            print("[CommandParser] Using Vosk (local) for transcription")
-            self._transcriber = VoskTranscriber()
-        else:
-            print("[CommandParser] Using Deepgram (cloud) for transcription")
-            self._transcriber = DeepgramTranscriber()
+        self.valid_commands = set(config.VALID_COMMANDS)
+        print("[CommandParser] Using Vosk (local) for transcription")
+        self._transcriber = VoskTranscriber()
 
     def _transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
-        """Transcribe audio using configured transcriber."""
+        """Transcribe audio using Vosk."""
         return self._transcriber.transcribe(audio, sample_rate)
 
-    def _build_system_prompt(self) -> str:
-        """Build the system prompt for command extraction."""
-        commands_list = ", ".join(f'"{cmd}"' for cmd in self.valid_commands)
+    def _match_command(self, word: str) -> Optional[str]:
+        """Match a word to a command (direct or phonetic)."""
+        word = word.lower().strip()
 
-        return f"""You are a voice command parser for a game. Extract game commands from transcribed speech.
+        # Direct match
+        if word in self.valid_commands:
+            return word
 
-Valid commands: {commands_list}
+        # Phonetic match
+        if word in PHONETIC_MATCHES:
+            matched = PHONETIC_MATCHES[word]
+            if matched in self.valid_commands:
+                return matched
 
-Rules:
-1. Only extract commands from the list above
-2. Ignore filler words, partial words, or unclear speech
-3. If multiple commands are mentioned, return only the FIRST clear command
-4. If no valid command is detected, return null
-
-Respond with JSON only, no other text:
-{{"command": "<command>" | null, "confidence": <0.0-1.0>}}
-
-Examples:
-- Input "up": {{"command": "up", "confidence": 0.95}}
-- Input "go down now": {{"command": "down", "confidence": 0.90}}
-- Input "um uh": {{"command": null, "confidence": 0.0}}
-- Input "jump": {{"command": null, "confidence": 0.0}}"""
+        return None
 
     def parse(self, audio: np.ndarray, sample_rate: int) -> ParsedCommand:
-        """
-        Parse audio to extract command.
-        Uses Vosk/Deepgram for transcription, then OpenRouter for command parsing.
-        """
+        """Parse audio to extract a single command."""
         try:
-            # Step 1: Transcribe
             t0 = time.perf_counter()
             raw_text = self._transcribe(audio, sample_rate)
             transcribe_time = (time.perf_counter() - t0) * 1000
 
             if not raw_text:
                 print(f"[Transcribe] {transcribe_time:.0f}ms (empty)")
-                return ParsedCommand(
-                    command=None,
-                    raw_text=None,
-                    confidence=0.0
-                )
+                return ParsedCommand(command=None, raw_text=None, confidence=0.0)
 
-            # Step 2: Quick check - if transcription directly matches a command
-            # or is phonetically similar
-            text_lower = raw_text.lower().strip()
-            
-            # Direct match
-            for cmd in self.valid_commands:
-                if text_lower == cmd:
-                    print(f"[Transcribe] {transcribe_time:.0f}ms | Direct match: '{cmd}'")
-                    return ParsedCommand(
-                        command=cmd,
-                        raw_text=raw_text,
-                        confidence=0.95
-                    )
-            
-            # Phonetic/similar matches for common misrecognitions
-            # "up" often heard as "yup", "yep", "uh", "app", etc.
-            if text_lower in ["yup", "yep", "uh", "uhh", "app", "op"]:
-                return ParsedCommand(
-                    command="up",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "down" often heard as "dawn", "town", etc.
-            if text_lower in ["dawn", "town", "darn"]:
-                return ParsedCommand(
-                    command="down",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "start" often heard as "star", "starts", etc.
-            if text_lower in ["star", "starts", "starting", "started"]:
-                return ParsedCommand(
-                    command="start",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "pause" often heard as "paws", "paused", "pausing", etc.
-            if text_lower in ["paws", "paused", "pausing", "paus", "pos"]:
-                return ParsedCommand(
-                    command="pause",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "serve" often heard as "serves", "serving", "surf", etc.
-            if text_lower in ["serves", "serving", "served", "surf", "serve"]:
-                return ParsedCommand(
-                    command="serve",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "resume" often heard as "resumes", "resuming", etc.
-            if text_lower in ["resumes", "resuming", "resumed", "resume"]:
-                return ParsedCommand(
-                    command="resume",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # Boxing commands
-            # "jab" often heard as "job", "ja", "jap"
-            if text_lower in ["job", "ja", "jap", "jabs", "jabbed"]:
-                return ParsedCommand(
-                    command="jab",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "cross" often heard as "crawss", "craw", "crosses"
-            if text_lower in ["crawss", "craw", "crosses", "crossed"]:
-                return ParsedCommand(
-                    command="cross",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "hook" often heard as "huk", "hooked"
-            if text_lower in ["huk", "hooked", "hooking", "hulk"]:
-                return ParsedCommand(
-                    command="hook",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "uppercut" often heard as "upper", "cut", "upperkat", "upcut"
-            if text_lower in ["upper", "cut", "upperkat", "upcut", "uppercuts"]:
-                return ParsedCommand(
-                    command="uppercut",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "block" often heard as "blog", "blocked", "box"
-            if text_lower in ["blog", "blocked", "blocking", "box", "bloc"]:
-                return ParsedCommand(
-                    command="block",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "guard" synonym for block
-            if text_lower in ["guard", "guarding", "guarded"]:
-                return ParsedCommand(
-                    command="guard",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "dodge" often heard as "doge", "dodged", "dok"
-            if text_lower in ["doge", "dodged", "dodging", "dok", "dogs"]:
-                return ParsedCommand(
-                    command="dodge",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "duck" synonym for dodge
-            if text_lower in ["duck", "ducked", "ducking", "ducks"]:
-                return ParsedCommand(
-                    command="duck",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "forward" often heard as "for", "towards"
-            if text_lower in ["for", "towards", "forwards", "forwarded"]:
-                return ParsedCommand(
-                    command="forward",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "advance" synonym for forward
-            if text_lower in ["advance", "advancing", "advanced", "advances"]:
-                return ParsedCommand(
-                    command="advance",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "back" often heard as "bak", "backwards"
-            if text_lower in ["bak", "backwards", "backing", "backed"]:
-                return ParsedCommand(
-                    command="back",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "retreat" synonym for back
-            if text_lower in ["retreat", "retreating", "retreated", "retreats"]:
-                return ParsedCommand(
-                    command="retreat",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "left" synonym for jab
-            if text_lower in ["left", "lefty", "lefts"]:
-                return ParsedCommand(
-                    command="left",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "right" synonym for cross
-            if text_lower in ["right", "righty", "rights"]:
-                return ParsedCommand(
-                    command="right",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
-            
-            # "fight" often heard as "fights", "fighting"
-            if text_lower in ["fights", "fighting", "fighter"]:
-                return ParsedCommand(
-                    command="fight",
-                    raw_text=raw_text,
-                    confidence=0.85
-                )
+            # Try to match the whole text first
+            cmd = self._match_command(raw_text)
+            if cmd:
+                print(f"[Transcribe] {transcribe_time:.0f}ms | Direct match: '{cmd}'")
+                return ParsedCommand(command=cmd, raw_text=raw_text, confidence=0.95)
 
-            # Step 3: Use LLM to parse more complex utterances
-            t1 = time.perf_counter()
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self._build_system_prompt()
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Transcribed speech: \"{raw_text}\""
-                    }
-                ],
-                max_tokens=50,
-                temperature=0
-            )
+            # Try matching individual words
+            for word in raw_text.lower().split():
+                cmd = self._match_command(word)
+                if cmd:
+                    print(f"[Transcribe] {transcribe_time:.0f}ms | Word match: '{cmd}' from '{raw_text}'")
+                    return ParsedCommand(command=cmd, raw_text=raw_text, confidence=0.85)
 
-            llm_time = (time.perf_counter() - t1) * 1000
-            print(f"[Transcribe] {transcribe_time:.0f}ms | [LLM] {llm_time:.0f}ms | Text: '{raw_text}'")
+            print(f"[Transcribe] {transcribe_time:.0f}ms | No match: '{raw_text}'")
+            return ParsedCommand(command=None, raw_text=raw_text, confidence=0.0)
 
-            # Parse response
-            result_text = response.choices[0].message.content.strip()
-
-            # Clean up potential markdown formatting
-            if result_text.startswith("```"):
-                result_text = result_text.split("```")[1]
-                if result_text.startswith("json"):
-                    result_text = result_text[4:]
-                result_text = result_text.strip()
-
-            result = json.loads(result_text)
-
-            return ParsedCommand(
-                command=result.get("command"),
-                raw_text=raw_text,
-                confidence=float(result.get("confidence", 0.0))
-            )
-
-        except json.JSONDecodeError:
-            return ParsedCommand(
-                command=None,
-                raw_text=raw_text if 'raw_text' in dir() else None,
-                confidence=0.0
-            )
         except Exception as e:
             print(f"Command parsing error: {e}")
-            return ParsedCommand(
-                command=None,
-                raw_text=str(e),
-                confidence=0.0
-            )
+            return ParsedCommand(command=None, raw_text=str(e), confidence=0.0)
 
-    def parse_text_fallback(self, text: str) -> ParsedCommand:
-        """
-        Fallback parser for when we already have transcribed text.
-        Useful for testing without audio.
-        """
-        text_lower = text.lower().strip()
+    def parse_multiple(self, audio: np.ndarray, sample_rate: int) -> List[ParsedCommand]:
+        """Parse audio and extract ALL commands found."""
+        try:
+            t0 = time.perf_counter()
+            raw_text = self._transcribe(audio, sample_rate)
+            transcribe_time = (time.perf_counter() - t0) * 1000
 
-        for cmd in self.valid_commands:
-            if cmd in text_lower:
-                return ParsedCommand(
-                    command=cmd,
-                    raw_text=text,
-                    confidence=0.9
-                )
+            if not raw_text:
+                print(f"[Transcribe] {transcribe_time:.0f}ms (empty)")
+                return []
 
-        return ParsedCommand(
-            command=None,
-            raw_text=text,
-            confidence=0.0
-        )
+            # Find all commands in the text
+            commands_found = []
+            for word in raw_text.lower().split():
+                cmd = self._match_command(word)
+                if cmd:
+                    commands_found.append(cmd)
+
+            if commands_found:
+                print(f"[Transcribe] {transcribe_time:.0f}ms | Found {len(commands_found)} commands: {commands_found} from '{raw_text}'")
+                return [
+                    ParsedCommand(command=cmd, raw_text=raw_text, confidence=0.9)
+                    for cmd in commands_found
+                ]
+            else:
+                print(f"[Transcribe] {transcribe_time:.0f}ms | No commands in: '{raw_text}'")
+                return [ParsedCommand(command=None, raw_text=raw_text, confidence=0.0)]
+
+        except Exception as e:
+            print(f"Command parsing error: {e}")
+            return []

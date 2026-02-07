@@ -1,5 +1,9 @@
 import os
 import sys
+import warnings
+
+# Suppress torchaudio deprecation warning from pyannote
+warnings.filterwarnings("ignore", message=".*torchaudio._backend.set_audio_backend.*")
 
 # Add backend directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -126,11 +130,39 @@ async def boxing():
     return {"error": "Boxing not found"}
 
 
+# Serve Head Soccer game
+headsoccer_path = os.path.join(os.path.dirname(__file__), "..", "headsoccer")
+
+
+@app.get("/headsoccer")
+async def headsoccer():
+    """Serve the Head Soccer game."""
+    index_path = os.path.join(headsoccer_path, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"error": "Head Soccer not found"}
+# Serve Dance game
+dance_path = os.path.join(os.path.dirname(__file__), "..", "dance")
+
+
+@app.get("/dance")
+async def dance():
+    """Serve the Dance game."""
+    index_path = os.path.join(dance_path, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"error": "Dance not found"}
+
+
 # Mount static files (must be after all route definitions)
+if os.path.exists(headsoccer_path):
+    app.mount("/headsoccer-static", StaticFiles(directory=headsoccer_path), name="headsoccer")
 if os.path.exists(boxing_path):
     app.mount("/boxing-static", StaticFiles(directory=boxing_path), name="boxing")
 if os.path.exists(pong_path):
     app.mount("/pong-static", StaticFiles(directory=pong_path), name="pong")
+if os.path.exists(dance_path):
+    app.mount("/dance-static", StaticFiles(directory=dance_path), name="dance")
 if os.path.exists(frontend_path):
     app.mount("/", StaticFiles(directory=frontend_path), name="frontend")
 
