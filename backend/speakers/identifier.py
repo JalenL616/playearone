@@ -37,13 +37,14 @@ class SpeakerIdentifier:
 
         return float(np.dot(a, b) / (norm_a * norm_b))
 
-    def identify(self, audio: torch.Tensor, sample_rate: int) -> SpeakerMatch:
+    def identify(self, audio: torch.Tensor, sample_rate: int, allowed_speakers: Optional[List[str]] = None) -> SpeakerMatch:
         """
         Identify a speaker from audio.
 
         Args:
             audio: Audio tensor (channels, samples)
             sample_rate: Audio sample rate
+            allowed_speakers: Optional list of speaker names to restrict identification to
 
         Returns:
             SpeakerMatch with name, confidence, and whether speaker is known
@@ -51,6 +52,11 @@ class SpeakerIdentifier:
         # Extract embedding from input audio
         try:
             input_embedding = self._enrollment.extract_embedding(audio, sample_rate)
+            # Normalize the embedding
+            embedding_norm = np.linalg.norm(input_embedding)
+            if embedding_norm > 0:
+                input_embedding = input_embedding / embedding_norm
+            print(f"[Speaker ID] Input embedding norm after normalization: {np.linalg.norm(input_embedding):.3f}")
         except Exception as e:
             return SpeakerMatch(
                 name="Unknown",
@@ -68,22 +74,44 @@ class SpeakerIdentifier:
                 is_known=False
             )
 
+        # Filter to allowed speakers if specified
+        if allowed_speakers:
+            speakers = [s for s in speakers if s["name"] in allowed_speakers]
+            if not speakers:
+                return SpeakerMatch(
+                    name="Unknown",
+                    confidence=0.0,
+                    is_known=False
+                )
+
         # Find best match
         best_match: Optional[str] = None
         best_similarity: float = -1.0
 
         for speaker in speakers:
+            # Ensure stored embedding is normalized
+            stored_embedding = np.array(speaker["embedding"])
+            stored_norm = np.linalg.norm(stored_embedding)
+            if stored_norm > 0:
+                stored_embedding = stored_embedding / stored_norm
+            
             similarity = self._cosine_similarity(
                 input_embedding,
-                speaker["embedding"]
+                stored_embedding
             )
 
             if similarity > best_similarity:
                 best_similarity = similarity
                 best_match = speaker["name"]
 
+        # Debug logging
+        print(f"[Speaker ID] Best match: {best_match}, similarity: {best_similarity:.3f}, allowed: {allowed_speakers}")
+
+        # Use lower threshold when restricted to game players
+        threshold = config.SPEAKER_GAME_THRESHOLD if allowed_speakers else self.threshold
+
         # Check if above threshold
-        if best_similarity >= self.threshold and best_match:
+        if best_similarity >= threshold and best_match:
             return SpeakerMatch(
                 name=best_match,
                 confidence=best_similarity,

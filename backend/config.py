@@ -21,6 +21,7 @@ CHUNK_DURATION_MS = 500
 
 # Speaker identification
 SPEAKER_SIMILARITY_THRESHOLD = 0.3  # Cosine similarity threshold for speaker matching
+SPEAKER_GAME_THRESHOLD = 0.15  # Lower threshold for active game players
 ENROLLMENT_DURATION_SECONDS = 5
 
 # Paths
@@ -32,6 +33,6 @@ VALID_COMMANDS = ["up", "down"]
 
 # Player assignments: speaker name → player number (1 = left, 2 = right)
 PLAYER_ASSIGNMENTS = {
-    "maya": 1,
-    "inaara": 2,
+    "Jalen": 1,
+    "UP": 2,
 }

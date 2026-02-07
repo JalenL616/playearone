@@ -74,6 +74,15 @@ class SpeakerEnrollment:
 
         try:
             embedding = self.extract_embedding(audio, sample_rate)
+            
+            # Debug: check embedding quality
+            embedding_norm = np.linalg.norm(embedding)
+            print(f"[Enrollment] Speaker: {name}, embedding norm: {embedding_norm:.3f}, shape: {embedding.shape}")
+            
+            # Normalize the embedding
+            if embedding_norm > 0:
+                embedding = embedding / embedding_norm
+            
             success = self.storage.add_speaker(name, embedding)
 
             if success:

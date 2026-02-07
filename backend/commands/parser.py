@@ -130,7 +130,10 @@ Examples:
                 )
 
             # Step 2: Quick check - if transcription directly matches a command
+            # or is phonetically similar
             text_lower = raw_text.lower().strip()
+            
+            # Direct match
             for cmd in self.valid_commands:
                 if text_lower == cmd:
                     return ParsedCommand(
@@ -138,6 +141,23 @@ Examples:
                         raw_text=raw_text,
                         confidence=0.95
                     )
+            
+            # Phonetic/similar matches for common misrecognitions
+            # "up" often heard as "yup", "yep", "uh", "app", etc.
+            if text_lower in ["yup", "yep", "uh", "uhh", "app", "op"]:
+                return ParsedCommand(
+                    command="up",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "down" often heard as "dawn", "town", etc.
+            if text_lower in ["dawn", "town", "darn"]:
+                return ParsedCommand(
+                    command="down",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
 
             # Step 3: Use LLM to parse more complex utterances
             response = self.client.chat.completions.create(

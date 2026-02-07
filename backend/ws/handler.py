@@ -141,13 +141,13 @@ class WebSocketHandler:
 
         # Process live audio when we have enough
         buffer = self.buffers.get(conn_id)
-        if buffer and buffer.duration_seconds() >= 1.0:
+        if buffer and buffer.duration_seconds() >= 1.5:
             await self._process_audio_chunk(websocket, buffer)
 
     async def _process_audio_chunk(self, websocket: WebSocket, buffer: AudioBuffer) -> None:
         """Process accumulated audio for command detection."""
-        # Get audio from buffer (1 second chunks)
-        audio = buffer.consume(1.0)
+        # Get audio from buffer (1.5 second chunks for better speaker ID)
+        audio = buffer.consume(1.5)
         if audio is None:
             return
 
@@ -191,7 +191,9 @@ class WebSocketHandler:
 
     def _identify_speaker(self, audio_tensor: torch.Tensor, sample_rate: int):
         """Run speaker identification (for parallel execution)."""
-        return self.identifier.identify(audio_tensor, sample_rate)
+        # Get active players from config
+        allowed_speakers = list(config.PLAYER_ASSIGNMENTS.keys()) if config.PLAYER_ASSIGNMENTS else None
+        return self.identifier.identify(audio_tensor, sample_rate, allowed_speakers=allowed_speakers)
 
     def _parse_command(self, audio: np.ndarray, sample_rate: int):
         """Run command parsing (for parallel execution)."""
