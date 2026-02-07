@@ -53,7 +53,7 @@ Microphone → Browser → WebSocket → Backend → Speaker ID + Command Parse 
   - **Normalize** amplitude to the [-1, 1] range
 - Two output formats are prepared:
   - `prepare_for_pyannote()` — PyTorch tensor for speaker identification
-  - `prepare_for_openai()` — 16-bit PCM bytes for Whisper transcription
+  - WAV bytes for Deepgram transcription
 
 ### 5. Speaker Identification (Backend)
 
@@ -69,19 +69,20 @@ Microphone → Browser → WebSocket → Backend → Speaker ID + Command Parse 
 ### 6. Command Recognition (Backend)
 
 **File:** `backend/commands/parser.py`
-**Models:** OpenAI Whisper (local) + OpenRouter LLM
+**Models:** Deepgram Nova-2 (cloud) + OpenRouter LLM (fallback)
 
-This is a two-stage process:
+Speaker identification and command recognition run **in parallel** via a `ThreadPoolExecutor`.
 
-**Stage A — Transcription (Whisper)**
-- The audio is transcribed to text using a local Whisper model
-- This converts speech into a raw text transcript
+**Stage A — Transcription (Deepgram)**
+- Audio is converted to WAV bytes and sent to the **Deepgram Nova-2** API for transcription
+- Returns a text transcript of the speech
 
-**Stage B — Command Extraction (LLM)**
-- The transcript is sent to an LLM via the OpenRouter API
-- The LLM is prompted to extract valid game commands from the text
+**Stage B — Command Extraction (fast path or LLM)**
+- **Fast path:** If the transcript exactly matches a valid command ("up", "down"), it returns immediately with 0.95 confidence — the LLM is skipped entirely
+- **Slow path:** If the transcript is more complex (e.g. "move the paddle up"), it's sent to an LLM via the OpenRouter API for command extraction
 - Valid commands are defined in `config.py`: `["up", "down"]`
-- The LLM returns a structured response with the detected command (or none)
+
+**Silence filtering:** The handler checks RMS energy before processing and filters known hallucination phrases ("thank you", "subscribe", etc.)
 
 ### 7. Response (Backend → Frontend)
 
@@ -156,15 +157,15 @@ User enters name → Clicks "Start Recording" → Speaks for 5 seconds → Backe
 │               └───┬───────┬───┘               │
 │                   │       │                   │
 │          ┌────────▼──┐ ┌──▼─────────┐         │
-│          │  Pyannote │ │  Whisper   │         │
-│          │ Speaker   │ │ Transcribe │         │
-│          │ Embedding │ └──────┬─────┘         │
-│          └─────┬─────┘       │                │
-│                │        ┌────▼─────┐          │
-│          ┌─────▼─────┐  │ LLM via  │         │
-│          │  Compare   │  │OpenRouter│         │
-│          │  vs Enrolled│ │ Command  │         │
-│          │  Speakers  │  │ Extract  │         │
+│          │  Pyannote │ │ Deepgram  │         │
+│          │ Speaker   │ │ Nova-2    │         │
+│          │ Embedding │ │Transcribe │         │
+│          └─────┬─────┘ └──────┬───┘          │
+│                │              │               │
+│          ┌─────▼─────┐  ┌────▼──────┐        │
+│          │  Compare   │  │ Direct    │        │
+│          │  vs Enrolled│ │ match or  │        │
+│          │  Speakers  │  │ LLM parse │        │
 │          └─────┬──────┘  └────┬─────┘         │
 │                │              │                │
 │                └──────┬───────┘                │
@@ -188,5 +189,6 @@ User enters name → Clicks "Start Recording" → Speaks for 5 seconds → Backe
 | Speaker similarity threshold | 0.3 | `config.py` |
 | Valid commands | "up", "down" | `config.py` |
 | Speaker embedding model | Pyannote wespeaker-voxceleb-resnet34-LM | `enrollment.py` |
-| Transcription model | OpenAI Whisper (local) | `parser.py` |
-| Command extraction | OpenRouter LLM | `parser.py` |
+| Transcription model | Deepgram Nova-2 (cloud) | `parser.py` |
+| Command extraction | Direct match, or OpenRouter LLM fallback | `parser.py` |
+| LLM model | openai/gpt-4o-mini via OpenRouter | `config.py` |

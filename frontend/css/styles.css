@@ -44,6 +44,25 @@ header h1 {
 .subtitle {
     color: var(--text-secondary);
     font-size: 1.1rem;
+    margin-bottom: 15px;
+}
+
+.play-pong-btn {
+    display: inline-block;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s;
+    box-shadow: 0 4px 6px rgba(233, 69, 96, 0.3);
+}
+
+.play-pong-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(233, 69, 96, 0.4);
 }
 
 .status-bar {

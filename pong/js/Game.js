@@ -12,8 +12,7 @@ class Game {
     this.ball = new Ball(
       this.canvasWidth / 2,
       this.canvasHeight / 2,
-      BALL_SIZE,
-      BALL_SPEED
+      BALL_SIZE
     );
 
     this.leftPaddle = new Paddle(
@@ -191,7 +190,15 @@ class Game {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const game = new Game();
-  game.start();
+// Scripts are loaded dynamically after DOM is ready, so run immediately
+const game = new Game();
+game.start();
+
+const voice = new VoiceInput();
+voice.initialize().catch(() => {
+  const el = document.getElementById('voiceStatus');
+  if (el) {
+    el.textContent = 'Voice: Unavailable';
+    el.style.color = '#666';
+  }
 });

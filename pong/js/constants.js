@@ -9,7 +9,7 @@ const PADDLE_SPEED = 12;
 
 // Ball
 const BALL_SIZE = 10;
-const BALL_SPEED = 7;
+const BALL_SPEED = 1;
 
 // Game
 const WINNING_SCORE = 10;

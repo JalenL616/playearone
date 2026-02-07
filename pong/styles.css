@@ -6,12 +6,134 @@
 
 body {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: 100vh;
   background-color: #1a1a1a;
+}
+
+.nav-header {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+}
+
+.nav-btn {
+  display: inline-block;
+  padding: 10px 20px;
+  background: #2a2a2a;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 14px;
+  border: 1px solid #444;
+  transition: all 0.2s;
+}
+
+.nav-btn:hover {
+  background: #333;
+  border-color: #666;
+}
+
+#gameWrapper {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+#centerColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 canvas {
   border: 2px solid #444;
+}
+
+#voiceStatus {
+  color: #666;
+  font-family: monospace;
+  font-size: 14px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.player-panel {
+  width: 140px;
+  text-align: center;
+  font-family: monospace;
+}
+
+.player-name {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+#player1Panel .player-name {
+  color: #00BFFF;
+}
+
+#player2Panel .player-name {
+  color: #FF4500;
+}
+
+.player-command {
+  font-size: 28px;
+  font-weight: bold;
+  height: 40px;
+  line-height: 40px;
+  opacity: 0;
+  transition: opacity 0.1s ease-in;
+}
+
+#player1Panel .player-command {
+  color: #00BFFF;
+}
+
+#player2Panel .player-command {
+  color: #FF4500;
+}
+
+.player-command.active {
+  opacity: 1;
+}
+
+.player-select {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 12px;
+  background: #2a2a2a;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.player-select:focus {
+  outline: none;
+  border-color: #666;
+}
+
+#player1Panel .player-select {
+  border-color: #00BFFF55;
+}
+
+#player1Panel .player-select:focus {
+  border-color: #00BFFF;
+}
+
+#player2Panel .player-select {
+  border-color: #FF450055;
+}
+
+#player2Panel .player-select:focus {
+  border-color: #FF4500;
 }

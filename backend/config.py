@@ -29,3 +29,9 @@ SPEAKERS_FILE = os.path.join(DATA_DIR, "speakers.json")
 
 # Valid commands (extensible)
 VALID_COMMANDS = ["up", "down"]
+
+# Player assignments: speaker name → player number (1 = left, 2 = right)
+PLAYER_ASSIGNMENTS = {
+    "maya": 1,
+    "inaara": 2,
+}

@@ -64,7 +64,7 @@ class WebSocketHandler:
                     # JSON control message
                     await self._handle_control(websocket, json.loads(message["text"]))
 
-        except WebSocketDisconnect:
+        except (WebSocketDisconnect, RuntimeError):
             pass
         finally:
             # Cleanup
@@ -160,8 +160,10 @@ class WebSocketHandler:
         )
 
         if result:
+            player = config.PLAYER_ASSIGNMENTS.get(result.speaker, None)
             await self._send_message(websocket, {
                 "type": "command",
+                "player": player,
                 **result.to_dict()
             })
 
@@ -257,18 +259,26 @@ class WebSocketHandler:
             await self._send_error(websocket, "Failed to get audio")
             return
 
-        # Prepare for Pyannote
-        audio_tensor, sample_rate = self.audio_processor.prepare_for_pyannote(audio)
+        try:
+            # Prepare for Pyannote
+            audio_tensor, sample_rate = self.audio_processor.prepare_for_pyannote(audio)
 
-        # Run enrollment in thread pool
-        loop = asyncio.get_event_loop()
-        success, message = await loop.run_in_executor(
-            None,
-            self.enrollment.enroll,
-            name,
-            audio_tensor,
-            sample_rate
-        )
+            # Run enrollment in thread pool
+            loop = asyncio.get_event_loop()
+            success, message = await loop.run_in_executor(
+                None,
+                self.enrollment.enroll,
+                name,
+                audio_tensor,
+                sample_rate
+            )
+        except Exception as e:
+            print(f"Enrollment error: {e}")
+            import traceback
+            traceback.print_exc()
+            await self._send_error(websocket, f"Enrollment failed: {e}")
+            self.enrollment_buffers[conn_id] = AudioBuffer()
+            return
 
         # Clear enrollment buffer
         self.enrollment_buffers[conn_id] = AudioBuffer()

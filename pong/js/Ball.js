@@ -1,11 +1,10 @@
 class Ball {
-  constructor(x, y, radius, speed) {
+  constructor(x, y, radius) {
     this.x = x;
     this.y = y;
     this.radius = radius;
-    this.speed = speed;
-    this.dx = speed;
-    this.dy = speed;
+    this.dx = BALL_SPEED;
+    this.dy = BALL_SPEED;
     this.speedMultiplier = 1;
   }
 
@@ -49,16 +48,16 @@ class Ball {
     this.y = canvasHeight / 2;
     this.speedMultiplier = 1;
     
-    // Set horizontal direction
+    // Set horizontal direction using BALL_SPEED constant
     if (serveDirection === 'left') {
-      this.dx = -this.speed; // Serve toward left player
+      this.dx = -BALL_SPEED; // Serve toward left player
     } else if (serveDirection === 'right') {
-      this.dx = this.speed; // Serve toward right player
+      this.dx = BALL_SPEED; // Serve toward right player
     } else {
-      this.dx = (Math.random() > 0.5 ? 1 : -1) * this.speed;
+      this.dx = (Math.random() > 0.5 ? 1 : -1) * BALL_SPEED;
     }
     
     // Random vertical angle between -0.7 and 0.7 of speed
-    this.dy = (Math.random() * 1.4 - 0.7) * this.speed;
+    this.dy = (Math.random() * 1.4 - 0.7) * BALL_SPEED;
   }
 }
