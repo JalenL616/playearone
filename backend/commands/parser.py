@@ -130,11 +130,6 @@ class CommandParser:
             if matched in self.valid_commands:
                 return matched
 
-Examples:
-- Input "up": {{"command": "up", "confidence": 0.95}}
-- Input "go down now": {{"command": "down", "confidence": 0.90}}
-- Input "kick it": {{"command": "kick", "confidence": 0.90}}
-- Input "um uh": {{"command": null, "confidence": 0.0}}"""
         return None
 
     def parse(self, audio: np.ndarray, sample_rate: int) -> ParsedCommand:
