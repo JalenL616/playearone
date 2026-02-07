@@ -35,7 +35,6 @@ class WebSocketHandler:
     """Handles WebSocket connections for audio streaming."""
 
     def __init__(self):
-        self.narrator = Narrator()
         self.storage = SpeakerStorage()
         self.enrollment = SpeakerEnrollment(self.storage)
         self.identifier = SpeakerIdentifier(self.storage)
@@ -48,10 +47,12 @@ class WebSocketHandler:
         # Per-connection state
         self.buffers: Dict[int, AudioBuffer] = {}
         self.enrollment_buffers: Dict[int, AudioBuffer] = {}
+        self.narrators: Dict[int, Narrator] = {}
+        self.game_types: Dict[int, str] = {}
         
         # Track speech duration per speaker per connection
-        self.speech_start_time: Dict[tuple, Optional[float]] = {}  # (conn_id, speaker) -> start_time
-        self.last_speech_time: Dict[tuple, float] = {}  # (conn_id, speaker) -> timestamp
+        self.speech_start_time: Dict[tuple, Optional[float]] = {}
+        self.last_speech_time: Dict[tuple, float] = {}
 
     async def handle_connection(self, websocket: WebSocket) -> None:
         """Main handler for a WebSocket connection."""
@@ -59,37 +60,57 @@ class WebSocketHandler:
         conn_id = id(websocket)
         self.buffers[conn_id] = AudioBuffer()
         self.enrollment_buffers[conn_id] = AudioBuffer()
+        
+        # Create default narrator (will be replaced if client specifies game type)
+        self.narrators[conn_id] = Narrator(game_type="pong")
+        self.game_types[conn_id] = "pong"
 
         try:
             while True:
                 message = await websocket.receive()
 
                 if "bytes" in message:
-                    # Binary audio data
                     await self._handle_audio(websocket, message["bytes"])
 
                 elif "text" in message:
-                    # JSON control message
                     await self._handle_control(websocket, json.loads(message["text"]))
 
-        except (WebSocketDisconnect, RuntimeError):
-            pass
+        except (WebSocketDisconnect, RuntimeError) as e:
+            print(f"[WebSocket] Connection {conn_id} closed: {e}")
+        except Exception as e:
+            print(f"[WebSocket] Unexpected error for {conn_id}: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             # Cleanup
             self.buffers.pop(conn_id, None)
             self.enrollment_buffers.pop(conn_id, None)
+            self.narrators.pop(conn_id, None)
+            self.game_types.pop(conn_id, None)
+            print(f"[WebSocket] Cleaned up connection {conn_id}")
 
     async def _handle_control(self, websocket: WebSocket, message: Dict[str, Any]) -> None:
         """Handle control messages from client."""
         msg_type = message.get("type")
+        conn_id = id(websocket)
 
-        if msg_type == "start_enrollment":
+        if msg_type == "start_listening":
+            # Get game type from message and update narrator if specified
+            game_type = message.get("game")
+            if game_type and game_type != self.game_types.get(conn_id):
+                print(f"[WebSocket] Connection {conn_id} switching to {game_type}")
+                self.game_types[conn_id] = game_type
+                self.narrators[conn_id] = Narrator(game_type=game_type)
+            
+            self.buffers[conn_id] = AudioBuffer()
+            await self._send_message(websocket, {"type": "listening_started"})
+
+        elif msg_type == "start_enrollment":
             name = message.get("name", "").strip()
             if not name:
                 await self._send_error(websocket, "Name is required for enrollment")
                 return
 
-            conn_id = id(websocket)
             self.enrollment_buffers[conn_id] = AudioBuffer()
 
             await self._send_message(websocket, {
@@ -103,7 +124,6 @@ class WebSocketHandler:
             await self._complete_enrollment(websocket, name)
 
         elif msg_type == "cancel_enrollment":
-            conn_id = id(websocket)
             self.enrollment_buffers[conn_id] = AudioBuffer()
             await self._send_message(websocket, {"type": "enrollment_cancelled"})
 
@@ -123,13 +143,7 @@ class WebSocketHandler:
                 "success": success
             })
 
-        elif msg_type == "start_listening":
-            conn_id = id(websocket)
-            self.buffers[conn_id] = AudioBuffer()
-            await self._send_message(websocket, {"type": "listening_started"})
-
         elif msg_type == "stop_listening":
-            conn_id = id(websocket)
             self.buffers[conn_id] = AudioBuffer()
             await self._send_message(websocket, {"type": "listening_stopped"})
 
@@ -189,13 +203,24 @@ class WebSocketHandler:
 
     async def _trigger_narration(self, websocket: WebSocket, speaker: str, command: str):
         """Generates AI audio and sends it to the frontend."""
-        audio_b64 = await self.narrator.get_narration(speaker, command)
-        if audio_b64:
-            await self._send_message(websocket, {
-                "type": "narrator_audio",
-                "audio": audio_b64
-            })
+        conn_id = id(websocket)
+        narrator = self.narrators.get(conn_id)
+        
+        if not narrator:
+            print(f"[Narrator] No narrator for connection {conn_id}")
+            return
+        
+        try:
+            audio_b64 = await narrator.get_narration(speaker, command)
+            if audio_b64:
+                await self._send_message(websocket, {
+                    "type": "narrator_audio",
+                    "audio": audio_b64
+                })
+        except Exception as e:
+            print(f"[Narrator] Error generating narration: {e}")
 
+    # ... rest of your methods stay exactly the same (no changes needed)
     def _is_audio_silent(self, audio: np.ndarray, threshold: float = 0.01) -> bool:
         """Check if audio is mostly silent based on RMS energy."""
         rms = np.sqrt(np.mean(audio ** 2))

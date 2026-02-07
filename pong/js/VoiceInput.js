@@ -19,6 +19,9 @@ class VoiceInput {
         // Track last direction for continuous control
         this.lastDirection = { 1: null, 2: null };
         this.continuousActive = { 1: false, 2: false };
+
+        this.audioQueue = [];
+        this.isNarratorPlaying = false;
     }
 
     async initialize() {
@@ -152,7 +155,11 @@ class VoiceInput {
 
         this.socket.onopen = () => {
             console.log('[Voice] WebSocket opened');
-            this.socket.send(JSON.stringify({ type: 'start_listening' }));
+            // Send game type on connection
+            this.socket.send(JSON.stringify({ 
+                type: 'start_listening',
+                game: 'pong'
+            }));
             this.updateStatus('connected');
         };
 
@@ -177,6 +184,8 @@ class VoiceInput {
                     this.updateVolumeMeter(data.player, data.volume || 0);
                     this.handleContinuousControl(data.player, data.volume || 0);
                 }
+            } else if (data.type === 'narrator_audio') {
+                this.enqueueNarratorAudio(data.audio);
             }
         };
 
@@ -193,6 +202,31 @@ class VoiceInput {
             console.error('[Voice] WebSocket error:', event);
             this.updateStatus('error');
         };
+    }
+
+    enqueueNarratorAudio(base64Audio) {
+    const audioUrl = `data:audio/mp3;base64,${base64Audio}`;
+    this.audioQueue.push(audioUrl);
+    this.playNextNarratorClip();
+    }
+
+    playNextNarratorClip() {
+        if (this.isNarratorPlaying || this.audioQueue.length === 0) return;
+
+        this.isNarratorPlaying = true;
+        const url = this.audioQueue.shift();
+        const audio = new Audio(url);
+
+        audio.onended = () => {
+            this.isNarratorPlaying = false;
+            this.playNextNarratorClip();
+        };
+
+        audio.play().catch(e => {
+            console.error("Narrator playback failed", e);
+            this.isNarratorPlaying = false;
+            this.playNextNarratorClip();
+        });
     }
 
     handleVoiceCommand(player, command, confidence, volume = 0) {

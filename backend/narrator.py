@@ -8,7 +8,7 @@ from typing import Optional
 import config
 
 class Narrator:
-    def __init__(self):
+    def __init__(self, game_type):
         # Client for Text (OpenRouter)
         self.text_client = OpenAI(
             api_key=config.OPENROUTER_API_KEY,
@@ -16,20 +16,37 @@ class Narrator:
         )
         self.model = config.LLM_MODEL
         self.last_comment_time = 0
-        self.cooldown = 5.0 
+        self.cooldown = 5.0
+        self.game_type = game_type
         
-        # Choose a voice (En-US-GuyNeural is great for announcers)
-        # You can see all voices via: edge-tts --list-voices
+        # Choose a voice
         self.voice = "en-US-RogerNeural"
+        
+        # Game-specific prompts
+        self.game_prompts = {
+            "pong": {
+                "system": "You are a witty, high-energy sports announcer for a Pong game. Keep comments under 10 words. Respond ONLY with the commentary.",
+                "user_template": "Player {speaker} just moved their paddle {action}!"
+            },
+            "boxing": {
+                "system": "You are a witty, high-energy 1920s boxing radio announcer. Keep comments under 10 words. Respond ONLY with the commentary.",
+                "user_template": "The boxer {speaker} just threw a {action}!"
+            }
+        }
 
     def generate_commentary_text(self, speaker_name: str, action: str) -> Optional[str]:
         """Ask OpenRouter to generate a punchy commentary line."""
         try:
+            prompts = self.game_prompts.get(self.game_type, self.game_prompts.keys())
+            
             response = self.text_client.chat.completions.create(     
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a witty, high-energy 1920s boxing radio announcer. Keep comments under 10 words. Respond ONLY with the commentary."},
-                    {"role": "user", "content": f"The boxer {speaker_name} just threw a {action}!"}
+                    {"role": "system", "content": prompts["system"]},
+                    {"role": "user", "content": prompts["user_template"].format(
+                        speaker=speaker_name, 
+                        action=action
+                    )}
                 ],
                 max_tokens=30,
                 temperature=0.8
@@ -59,14 +76,18 @@ class Narrator:
         if current_time - self.last_comment_time < self.cooldown:
             return None
 
-        # 1. Get the text from OpenRouter (run in thread because OpenAI SDK is blocking)
+        # Update cooldown timestamp BEFORE generation to prevent overlaps
+        self.last_comment_time = current_time
+
         loop = asyncio.get_event_loop()
         text = await loop.run_in_executor(None, self.generate_commentary_text, speaker, action)
         
         if text:
-            # 2. Get the audio from Edge-TTS (native async)
             audio_b64 = await self.generate_tts_audio(text)
             if audio_b64:
-                self.last_comment_time = time.time()
                 return audio_b64
+        
+        # If generation failed, reset cooldown so we can try again sooner
+        self.last_comment_time = current_time - self.cooldown + 1.0
         return None
+    
