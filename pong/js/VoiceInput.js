@@ -152,6 +152,7 @@ class VoiceInput {
 
         this.socket.onopen = () => {
             console.log('[Voice] WebSocket opened');
+            this.socket.send(JSON.stringify({ type: 'set_mode', mode: 'game' }));
             this.socket.send(JSON.stringify({ type: 'start_listening' }));
             this.updateStatus('connected');
         };
