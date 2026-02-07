@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlayEarOne - Voice Command System</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PlayEarOne</h1>
+            <p class="subtitle">Voice Command System</p>
+        </header>
+
+        <div class="status-bar">
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot disconnected"></span>
+                <span>Disconnected</span>
+            </div>
+            <div class="mic-status" id="micStatus">
+                <span class="mic-icon">🎤</span>
+                <span>Mic Off</span>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="live">Live Commands</button>
+            <button class="tab" data-tab="enrollment">Speaker Enrollment</button>
+            <button class="tab" data-tab="speakers">Enrolled Speakers</button>
+        </div>
+
+        <!-- Live Commands Panel -->
+        <div class="panel active" id="livePanel">
+            <div class="controls">
+                <button id="startListening" class="btn primary" disabled>Start Listening</button>
+                <button id="stopListening" class="btn secondary" disabled>Stop Listening</button>
+            </div>
+
+            <div class="command-log" id="commandLog">
+                <div class="log-placeholder">Commands will appear here...</div>
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <span class="stat-label">Commands Detected</span>
+                    <span class="stat-value" id="commandCount">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Active Speakers</span>
+                    <span class="stat-value" id="activeSpeakers">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enrollment Panel -->
+        <div class="panel" id="enrollmentPanel">
+            <div class="enrollment-form">
+                <label for="speakerName">Speaker Name</label>
+                <input type="text" id="speakerName" placeholder="Enter name...">
+
+                <div class="enrollment-controls">
+                    <button id="startEnrollment" class="btn primary">Start Recording</button>
+                    <button id="cancelEnrollment" class="btn secondary" disabled>Cancel</button>
+                </div>
+
+                <div class="enrollment-progress" id="enrollmentProgress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">Speak for 5 seconds to enroll your voice</p>
+                </div>
+
+                <div class="enrollment-status" id="enrollmentStatus"></div>
+            </div>
+        </div>
+
+        <!-- Speakers Panel -->
+        <div class="panel" id="speakersPanel">
+            <div class="speakers-list" id="speakersList">
+                <div class="log-placeholder">Loading speakers...</div>
+            </div>
+            <button id="refreshSpeakers" class="btn secondary">Refresh List</button>
+        </div>
+    </div>
+
+    <script src="/static/js/audio-capture.js"></script>
+    <script src="/static/js/websocket.js"></script>
+    <script src="/static/js/enrollment.js"></script>
+    <script src="/static/js/display.js"></script>
+</body>
+</html>

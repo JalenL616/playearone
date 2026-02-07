@@ -1,0 +1,387 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-tertiary: #0f3460;
+    --accent: #e94560;
+    --accent-hover: #ff6b6b;
+    --text-primary: #eee;
+    --text-secondary: #aaa;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --error: #ef4444;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    padding: 30px 0;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    color: var(--accent);
+    margin-bottom: 5px;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+.status-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px 20px;
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.connection-status, .mic-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--error);
+}
+
+.status-dot.connected {
+    background: var(--success);
+}
+
+.status-dot.disconnected {
+    background: var(--error);
+}
+
+.mic-icon {
+    font-size: 1.2rem;
+    opacity: 0.5;
+}
+
+.mic-icon.active {
+    opacity: 1;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.tab {
+    flex: 1;
+    padding: 12px 20px;
+    background: var(--bg-secondary);
+    border: none;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    background: var(--bg-tertiary);
+}
+
+.tab.active {
+    background: var(--accent);
+    color: white;
+}
+
+.panel {
+    display: none;
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    padding: 20px;
+    min-height: 400px;
+}
+
+.panel.active {
+    display: block;
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn.primary {
+    background: var(--accent);
+    color: white;
+}
+
+.btn.primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.btn.secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.btn.secondary:hover:not(:disabled) {
+    background: #1a5a8a;
+}
+
+.command-log {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    padding: 15px;
+    height: 300px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.log-placeholder {
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 20px;
+}
+
+.command-entry {
+    padding: 12px;
+    margin-bottom: 10px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    border-left: 4px solid var(--accent);
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.command-entry .header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.command-entry .speaker {
+    font-weight: bold;
+    color: var(--accent);
+}
+
+.command-entry .timestamp {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.command-entry .command {
+    font-size: 1.4rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+}
+
+.command-entry .command.up {
+    color: var(--success);
+}
+
+.command-entry .command.down {
+    color: var(--warning);
+}
+
+.command-entry .raw-text {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+.command-entry .confidence {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+.stats {
+    display: flex;
+    gap: 20px;
+}
+
+.stat {
+    flex: 1;
+    background: var(--bg-primary);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--accent);
+}
+
+/* Enrollment Panel */
+.enrollment-form {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.enrollment-form label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+}
+
+.enrollment-form input {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin-bottom: 20px;
+}
+
+.enrollment-form input:focus {
+    outline: 2px solid var(--accent);
+}
+
+.enrollment-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.enrollment-controls .btn {
+    flex: 1;
+}
+
+.enrollment-progress {
+    margin-bottom: 20px;
+}
+
+.progress-bar {
+    height: 10px;
+    background: var(--bg-primary);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.1s linear;
+}
+
+.progress-text {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.enrollment-status {
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.enrollment-status.success {
+    background: rgba(74, 222, 128, 0.2);
+    color: var(--success);
+}
+
+.enrollment-status.error {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--error);
+}
+
+/* Speakers Panel */
+.speakers-list {
+    margin-bottom: 20px;
+}
+
+.speaker-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: var(--bg-primary);
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.speaker-item .name {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.speaker-item .enrolled-at {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.speaker-item .btn-remove {
+    background: var(--error);
+    color: white;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+.speaker-item .btn-remove:hover {
+    background: #dc2626;
+}
