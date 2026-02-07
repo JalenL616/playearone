@@ -264,6 +264,26 @@ class DisplayManager {
     }
 }
 
+// Helper function for switching tabs (exposed globally for game cards)
+window.switchToTab = function(tabName) {
+    const tabs = document.querySelectorAll('.tab');
+    const targetTab = Array.from(tabs).find(t => t.dataset.tab === tabName);
+    
+    if (targetTab) {
+        // Update active tab
+        tabs.forEach(t => t.classList.remove('active'));
+        targetTab.classList.add('active');
+        
+        // Update active panel
+        const panelId = tabName + 'Panel';
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        const targetPanel = document.getElementById(panelId);
+        if (targetPanel) {
+            targetPanel.classList.add('active');
+        }
+    }
+};
+
 // Create singleton and initialize on DOM ready
 window.displayManager = new DisplayManager();
 

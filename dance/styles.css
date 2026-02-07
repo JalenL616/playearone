@@ -1,0 +1,267 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-tertiary: #0f3460;
+    --accent: #4CAF50;
+    --accent-hover: #66BB6A;
+    --text-primary: #eee;
+    --text-secondary: #aaa;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --error: #ef4444;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 0;
+    margin: 0;
+}
+
+/* Navigation Header */
+.nav-header {
+    background: var(--bg-secondary);
+    padding: 15px 20px;
+    display: flex;
+    gap: 15px;
+    border-bottom: 2px solid var(--accent);
+}
+
+.nav-btn {
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background 0.2s;
+}
+
+.nav-btn:hover {
+    background: var(--accent);
+}
+
+/* Dance Container */
+.dance-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.dance-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.dance-header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--accent);
+}
+
+.dance-header p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* Buttons */
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn.primary {
+    background: var(--accent);
+    color: white;
+}
+
+.btn.primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+}
+
+.btn.secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.btn.secondary:hover:not(:disabled) {
+    background: #1a4d7a;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-icon {
+    font-size: 1.2em;
+}
+
+#stopDance:not(:disabled):hover {
+    background: #ff8787 !important;
+}
+
+/* Dance Controls */
+.dance-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+/* Status Display */
+.dance-status {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.status-text {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(76, 175, 80, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--success);
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.status-timer {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--success);
+    margin-bottom: 1rem;
+}
+
+.progress-bar {
+    width: 100%;
+    max-width: 600px;
+    height: 8px;
+    background: #333;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), #8BC34A);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+/* Canvas */
+#danceCanvas {
+    display: block;
+    margin: 2rem auto;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 2px solid var(--success);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(76, 175, 80, 0.3);
+    max-width: 100%;
+}
+
+/* Transcript */
+.dance-transcript {
+    background: #2a2a3e;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    font-style: italic;
+    color: #aaa;
+    min-height: 40px;
+    text-align: center;
+}
+
+/* Score Display */
+.dance-score {
+    background: #2a2a3e;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.dance-score h3 {
+    text-align: center;
+    margin-bottom: 1rem;
+    color: var(--success);
+}
+
+.score-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #333;
+}
+
+.score-item:last-child {
+    border-bottom: none;
+}
+
+.score-item span:first-child {
+    color: var(--text-secondary);
+}
+
+.score-item span:last-child {
+    color: var(--success);
+    font-weight: bold;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dance-container {
+        padding: 20px 10px;
+    }
+
+    .dance-header h1 {
+        font-size: 2rem;
+    }
+
+    .dance-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    #danceCanvas {
+        width: 100%;
+        height: auto;
+    }
+}
