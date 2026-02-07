@@ -29,6 +29,9 @@ class BoxingVoiceInput {
     // Voice-triggered hold timers for block/dodge
     this.voiceHoldTimers = { 1: {}, 2: {} };
     this.voiceHoldDuration = 1000; // ms to hold block/dodge from voice command
+
+    this.audioQueue = [];
+    this.isNarratorPlaying = false;
   }
 
   isVoiceHoldActive(player, action) {
@@ -169,10 +172,12 @@ class BoxingVoiceInput {
     };
 
     this.socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'command' && data.player && data.command) {
-        this.handleVoiceCommand(data.player, data.command, data.command_confidence);
-      }
+        const data = JSON.parse(event.data);
+        if (data.type === 'command') {
+            this.handleVoiceCommand(data.player, data.command, data.command_confidence);
+        } else if (data.type === 'narrator_audio') {
+            this.enqueueNarratorAudio(data.audio);
+        }
     };
 
     this.socket.onclose = () => {
@@ -186,6 +191,31 @@ class BoxingVoiceInput {
       this.updateStatus('error');
     };
   }
+
+  enqueueNarratorAudio(base64Audio) {
+    const audioUrl = `data:audio/mp3;base64,${base64Audio}`;
+    this.audioQueue.push(audioUrl);
+    this.playNextNarratorClip();
+}
+
+playNextNarratorClip() {
+    if (this.isNarratorPlaying || this.audioQueue.length === 0) return;
+
+    this.isNarratorPlaying = true;
+    const url = this.audioQueue.shift();
+    const audio = new Audio(url);
+
+    audio.onended = () => {
+        this.isNarratorPlaying = false;
+        this.playNextNarratorClip();
+    };
+
+    audio.play().catch(e => {
+        console.error("Narrator playback failed", e);
+        this.isNarratorPlaying = false;
+        this.playNextNarratorClip();
+    });
+}
 
   handleVoiceCommand(player, command, confidence) {
     if (confidence < 0.65) return;

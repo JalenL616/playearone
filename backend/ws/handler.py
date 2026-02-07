@@ -13,7 +13,7 @@ from audio import AudioBuffer, AudioProcessor
 from speakers import SpeakerEnrollment, SpeakerIdentifier, SpeakerStorage
 from commands import CommandParser
 import config
-
+from narrator import Narrator
 
 @dataclass
 class CommandResult:
@@ -35,6 +35,7 @@ class WebSocketHandler:
     """Handles WebSocket connections for audio streaming."""
 
     def __init__(self):
+        self.narrator = Narrator()
         self.storage = SpeakerStorage()
         self.enrollment = SpeakerEnrollment(self.storage)
         self.identifier = SpeakerIdentifier(self.storage)
@@ -176,12 +177,24 @@ class WebSocketHandler:
                 **result.to_dict()
             })
 
+            if result.command:
+                asyncio.create_task(self._trigger_narration(websocket, result.speaker, result.command))
+
     # Common Whisper hallucinations on silence (filter these only)
     SILENCE_HALLUCINATIONS = [
         "thank you", "thanks for watching", "subscribe",
         "like and subscribe", "thanks for listening",
         "please subscribe", "thank you for watching"
     ]
+
+    async def _trigger_narration(self, websocket: WebSocket, speaker: str, command: str):
+        """Generates AI audio and sends it to the frontend."""
+        audio_b64 = await self.narrator.get_narration(speaker, command)
+        if audio_b64:
+            await self._send_message(websocket, {
+                "type": "narrator_audio",
+                "audio": audio_b64
+            })
 
     def _is_audio_silent(self, audio: np.ndarray, threshold: float = 0.01) -> bool:
         """Check if audio is mostly silent based on RMS energy."""
@@ -381,9 +394,21 @@ class WebSocketHandler:
         })
 
     async def _send_message(self, websocket: WebSocket, message: Dict[str, Any]) -> None:
-        """Send JSON message to client."""
-        await websocket.send_text(json.dumps(message))
+        """Send JSON message to client while handling NumPy types."""
+        def default_converter(obj):
+            import numpy as np
+            if isinstance(obj, (np.float32, np.float64)):
+                return float(obj)
+            if isinstance(obj, (np.int32, np.int64)):
+                return int(obj)
+            return str(obj)
 
+        try:
+            await websocket.send_text(json.dumps(message, default=default_converter))
+        except Exception as e:
+            print(f"Websocket Send Error: {e}")
+
+            
     async def _send_error(self, websocket: WebSocket, error: str) -> None:
         """Send error message to client."""
         await self._send_message(websocket, {
