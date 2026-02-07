@@ -28,6 +28,7 @@ class DanceManager {
     
     initializeUI() {
         this.startBtn = document.getElementById('startDance');
+        this.stopBtn = document.getElementById('stopDance');
         this.cancelBtn = document.getElementById('cancelDance');
         this.statusText = document.querySelector('.status-text');
         this.timerDisplay = document.getElementById('danceTimer');
@@ -39,6 +40,9 @@ class DanceManager {
         
         if (this.startBtn) {
             this.startBtn.addEventListener('click', () => this.startRecording());
+        }
+        if (this.stopBtn) {
+            this.stopBtn.addEventListener('click', () => this.finishRecording());
         }
         if (this.cancelBtn) {
             this.cancelBtn.addEventListener('click', () => this.cancelRecording());
@@ -100,6 +104,7 @@ class DanceManager {
         this.isRecording = true;
         this.recordingStartTime = Date.now();
         this.startBtn.disabled = true;
+        this.stopBtn.disabled = false;
         this.cancelBtn.disabled = false;
         this.scoreDiv.style.display = 'none';
         this.transcriptDiv.textContent = '';
@@ -114,7 +119,7 @@ class DanceManager {
             type: 'start_dance'
         }));
         
-        this.updateStatus('🎤 Describe your dance... Speak clearly!');
+        this.updateStatus('🎤 Describe your dance... Click "Done" when finished!');
         this.startTimer();
     }
     
@@ -129,9 +134,30 @@ class DanceManager {
         this.updateStatus('Cancelled. Ready to record.');
     }
     
+    finishRecording() {
+        if (!this.isRecording) return;
+        
+        const elapsed = (Date.now() - this.recordingStartTime) / 1000;
+        
+        // Require at least 3 seconds of recording
+        if (elapsed < 3) {
+            alert('Please record at least 3 seconds of description!');
+            return;
+        }
+        
+        // Send finish message to process immediately
+        this.wsClient.socket.send(JSON.stringify({
+            type: 'finish_dance'
+        }));
+        
+        this.stopRecording();
+        this.updateStatus('Processing your dance...');
+    }
+    
     stopRecording() {
         this.isRecording = false;
         this.startBtn.disabled = false;
+        this.stopBtn.disabled = true;
         this.cancelBtn.disabled = true;
         
         if (this.timerInterval) {

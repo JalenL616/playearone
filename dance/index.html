@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Dance Choreographer</title>
+  <link rel="stylesheet" id="cssLink">
+  <script>
+    if (location.pathname === '/dance') {
+      window.__basePath = '/dance-static/';
+    } else {
+      window.__basePath = '';
+    }
+    document.getElementById('cssLink').href = window.__basePath + 'styles.css';
+  </script>
+</head>
+<body>
+  <div class="nav-header">
+    <a href="/" class="nav-btn">← Back to Arcade</a>
+    <a href="/pong" class="nav-btn">Pong</a>
+    <a href="/boxing" class="nav-btn">Boxing</a>
+  </div>
+
+  <div class="dance-container">
+    <div class="dance-header">
+      <h1>🎭 AI Dance Choreographer</h1>
+      <p>Describe any dance with your voice. Watch AI choreograph it!</p>
+    </div>
+    
+    <div class="dance-controls">
+      <button id="startDance" class="btn primary">
+        <span class="btn-icon">🎤</span>
+        Create Dance (up to 30s)
+      </button>
+      <button id="stopDance" class="btn primary" disabled style="background: #ff6b6b;">
+        <span class="btn-icon">⏹️</span>
+        Done Recording
+      </button>
+      <button id="cancelDance" class="btn secondary" disabled>
+        Cancel
+      </button>
+    </div>
+    
+    <div class="dance-status" id="danceStatus">
+      <div class="status-text">Ready to record</div>
+      <div class="status-timer" id="danceTimer"></div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="danceProgress"></div>
+      </div>
+    </div>
+    
+    <canvas id="danceCanvas" width="800" height="600"></canvas>
+    
+    <div class="dance-transcript" id="danceTranscript"></div>
+    
+    <div class="dance-score" id="danceScore" style="display: none;">
+      <h3>Performance Score</h3>
+      <div class="score-item">
+        <span>Creativity:</span>
+        <span id="scoreCreativity">-</span>
+      </div>
+      <div class="score-item">
+        <span>Energy:</span>
+        <span id="scoreEnergy">-</span>
+      </div>
+      <div class="score-item">
+        <span>Style:</span>
+        <span id="scoreStyle">-</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    console.log('[Dance HTML] Script loader starting...');
+    console.log('[Dance HTML] __basePath:', window.__basePath);
+    
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const fullPath = window.__basePath + src;
+        console.log('[Dance HTML] Loading script:', fullPath);
+        
+        const s = document.createElement('script');
+        s.src = fullPath;
+        s.onload = () => {
+          console.log('[Dance HTML] ✓ Script loaded:', src);
+          resolve();
+        };
+        s.onerror = (err) => {
+          console.error('[Dance HTML] ✗ Script failed:', src, err);
+          reject(new Error(`Failed to load ${src}`));
+        };
+        document.body.appendChild(s);
+      });
+    }
+
+    // Load scripts in order
+    console.log('[Dance HTML] Starting script chain...');
+    loadScript('websocket.js')
+      .then(() => {
+        console.log('[Dance HTML] websocket.js complete, loading audio-capture.js...');
+        return loadScript('audio-capture.js');
+      })
+      .then(() => {
+        console.log('[Dance HTML] audio-capture.js complete, loading dance.js...');
+        return loadScript('dance.js');
+      })
+      .then(() => {
+        console.log('[Dance HTML] ✓ All scripts loaded successfully');
+      })
+      .catch(err => {
+        console.error('[Dance HTML] ✗ Script loading chain failed:', err);
+        alert('Failed to load dance scripts: ' + err.message);
+      });
+  </script>
+</body>
+</html>

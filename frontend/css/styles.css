@@ -559,3 +559,7 @@ header h1 {
     color: var(--success);
     font-weight: bold;
 }
+
+#stopDance:not(:disabled):hover {
+    background: #ff8787 !important;
+}

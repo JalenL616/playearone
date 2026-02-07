@@ -162,6 +162,24 @@ class WebSocketHandler:
             conn_id = id(websocket)
             self._cleanup_dance_state(conn_id)
             await self._send_message(websocket, {"type": "dance_cancelled"})
+        
+        elif msg_type == "finish_dance":
+            # Process dance immediately (user clicked "Done")
+            conn_id = id(websocket)
+            if self.dance_recording.get(conn_id, False):
+                elapsed = time.time() - self.dance_start_time.get(conn_id, 0)
+                print(f"[Dance] User finished early at {elapsed:.1f}s")
+                
+                # Minimum 3 seconds required
+                if elapsed < 3.0:
+                    await self._send_message(websocket, {
+                        "type": "dance_error",
+                        "message": "Please record at least 3 seconds of description."
+                    })
+                    self._cleanup_dance_state(conn_id)
+                else:
+                    # Process immediately
+                    await self._process_dance(websocket, conn_id)
 
         elif msg_type == "ping":
             await self._send_message(websocket, {"type": "pong"})
@@ -440,6 +458,10 @@ class WebSocketHandler:
     async def _process_dance(self, websocket: WebSocket, conn_id: int) -> None:
         """Process accumulated audio and generate dance plan."""
         try:
+            # Check if dance is still active (not already processed or cancelled)
+            if not self.dance_recording.get(conn_id, False):
+                return
+            
             if not self.dance_buffers.get(conn_id):
                 return
             
@@ -460,6 +482,7 @@ class WebSocketHandler:
             print(f"[Dance] Transcription complete: {transcript_time:.1f}s → '{transcript[:100]}...'")
             
             if not transcript or len(transcript.strip()) < 10:
+                print(f"[Dance] ✗ Transcript too short or empty")
                 await self._send_message(websocket, {
                     "type": "dance_error",
                     "message": "Could not understand the description. Please try again with clearer speech."
@@ -468,21 +491,30 @@ class WebSocketHandler:
                 return
             
             # Generate dance plan with LLM
+            print(f"[Dance] Starting AI choreography generation...")
             await self._send_message(websocket, {
                 "type": "dance_status",
-                "message": "Choreographing your moves..."
+                "message": "AI choreographing your dance..."
             })
             
+            llm_start = time.time()
             dance_plan = await self._generate_dance_plan(transcript)
+            llm_time = time.time() - llm_start
+            print(f"[Dance] ✓ AI generation complete in {llm_time:.2f}s")
+            print(f"[Dance] Generated {len(dance_plan['keyframes'])} keyframes")
+            print(f"[Dance] Dance duration: {dance_plan['duration']}s")
             
             # Send dance plan to frontend
+            print(f"[Dance] Sending dance plan to client...")
             await self._send_message(websocket, {
                 "type": "dance_plan",
                 "plan": dance_plan,
                 "transcript": transcript
             })
             
-            print(f"[Dance] Plan sent: {len(dance_plan['keyframes'])} keyframes over {dance_plan['duration']}s")
+            total_time = time.time() - transcript_start
+            print(f"[Dance] ✓ Complete pipeline: {total_time:.2f}s (transcribe: {transcript_time:.2f}s, LLM: {llm_time:.2f}s)")
+            print(f"[Dance] ========== DANCE PROCESSING COMPLETE ==========\n")
             
         except Exception as e:
             print(f"[Dance] Error processing: {e}")
@@ -498,6 +530,7 @@ class WebSocketHandler:
     async def _generate_dance_plan(self, transcript: str) -> Dict[str, Any]:
         """Use LLM to convert transcript to structured dance plan."""
         
+        print(f"[Dance LLM] Preparing prompt for choreography...")
         prompt = f"""You are a creative dance choreographer. Convert the user's description into a structured dance sequence for a stick figure character.
 
 Available poses (angles in degrees):
@@ -514,10 +547,13 @@ Available poses (angles in degrees):
 
 User description: "{transcript}"
 
-Create a 12-second dance sequence with 8-15 keyframes. Be creative and match the user's description closely.
+Create a dance sequence with 8-15 keyframes that matches the description. Space keyframes 1-2 seconds apart for smooth motion. Be creative and match the user's description closely.
+
+Explain your choreography choices in 1-2 sentences.
 
 Return ONLY valid JSON (no markdown, no explanation):
 {{
+  "reasoning": "I interpreted this as... so I chose...",
   "duration": 12.0,
   "keyframes": [
     {{"time": 0.0, "pose": "IDLE"}},
@@ -527,8 +563,12 @@ Return ONLY valid JSON (no markdown, no explanation):
   ]
 }}"""
 
+        print(f"[Dance LLM] Preparing to call OpenRouter API...")
+        print(f"[Dance LLM] Transcript: '{transcript[:100]}..." if len(transcript) > 100 else transcript + "'")
+        
         try:
             llm_start = time.time()
+            print(f"[Dance LLM] Sending request to {self.command_parser.model}...")
             response = self.command_parser.client.chat.completions.create(
                 model=self.command_parser.model,
                 messages=[
@@ -541,56 +581,98 @@ Return ONLY valid JSON (no markdown, no explanation):
                 timeout=10.0  # 10 second timeout
             )
             llm_time = time.time() - llm_start
-            print(f"[Dance] LLM generation: {llm_time:.1f}s")
+            print(f"[Dance LLM] ✓ Response received in {llm_time:.2f}s")
             
-            result = json.loads(response.choices[0].message.content)
+            response_content = response.choices[0].message.content
+            print(f"[Dance LLM] Response length: {len(response_content)} characters")
+            print(f"[Dance LLM] Parsing JSON response...")
+            
+            result = json.loads(response_content)
+            print(f"[Dance LLM] ✓ JSON parsed successfully")
             
             # Validate structure
+            print(f"[Dance LLM] Validating response structure...")
             if "duration" not in result or "keyframes" not in result:
+                print(f"[Dance LLM] ✗ Missing required fields (duration or keyframes)")
                 raise ValueError("Invalid JSON structure - missing duration or keyframes")
             
             if not isinstance(result["keyframes"], list):
+                print(f"[Dance LLM] ✗ Keyframes is not a list")
                 raise ValueError("Keyframes must be a list")
             
+            print(f"[Dance LLM] Found {len(result['keyframes'])} keyframes")
+            
             if len(result["keyframes"]) < 3:
+                print(f"[Dance LLM] ✗ Too few keyframes: {len(result['keyframes'])}")
                 raise ValueError(f"Too few keyframes: {len(result['keyframes'])} (need at least 3)")
             
             if len(result["keyframes"]) > 20:
                 # Trim to 20 keyframes max
+                print(f"[Dance LLM] ⚠ Too many keyframes ({len(result['keyframes'])}), trimming to 20")
                 result["keyframes"] = result["keyframes"][:20]
-                print(f"[Dance] Trimmed keyframes to 20")
             
             # Validate each keyframe
+            print(f"[Dance LLM] Validating individual keyframes...")
             valid_poses = {'IDLE', 'ARMS_UP', 'ARMS_WAVE_LEFT', 'ARMS_WAVE_RIGHT', 
                           'SPIN_LEFT', 'SPIN_RIGHT', 'KICK_LEFT', 'KICK_RIGHT', 'JUMP', 'BOW'}
             
+            fixed_count = 0
             for i, kf in enumerate(result["keyframes"]):
                 if "time" not in kf or "pose" not in kf:
+                    print(f"[Dance LLM] ✗ Keyframe {i} missing time or pose")
                     raise ValueError(f"Keyframe {i} missing time or pose")
                 
                 if kf["pose"] not in valid_poses:
-                    print(f"[Dance] Warning: Invalid pose '{kf['pose']}' at keyframe {i}, replacing with IDLE")
+                    print(f"[Dance LLM] ⚠ Invalid pose '{kf['pose']}' at keyframe {i} (time: {kf['time']}s), replacing with IDLE")
                     kf["pose"] = "IDLE"
+                    fixed_count += 1
+            
+            if fixed_count > 0:
+                print(f"[Dance LLM] Fixed {fixed_count} invalid poses")
             
             # Sort keyframes by time
+            print(f"[Dance LLM] Sorting keyframes by time...")
             result["keyframes"] = sorted(result["keyframes"], key=lambda k: k["time"])
             
-            print(f"[Dance] Valid plan: {len(result['keyframes'])} keyframes, {result['duration']}s")
+            # Calculate duration based on last keyframe + 1 second buffer
+            last_keyframe_time = result["keyframes"][-1]["time"]
+            calculated_duration = last_keyframe_time + 1.0  # Add 1 second buffer
+            
+            if "duration" in result and result["duration"] != calculated_duration:
+                print(f"[Dance LLM] ⚠ Adjusting duration from {result['duration']}s to {calculated_duration}s (based on last keyframe at {last_keyframe_time}s)")
+            
+            result["duration"] = calculated_duration
+            
+            # Log reasoning if provided
+            if "reasoning" in result:
+                print(f"[Dance LLM] 💭 Choreography Reasoning:")
+                print(f"[Dance LLM]    {result['reasoning']}")
+            
+            print(f"[Dance LLM] ✓ Validation complete")
+            print(f"[Dance LLM] Final plan: {len(result['keyframes'])} keyframes over {result['duration']}s")
+            for i, kf in enumerate(result["keyframes"][:5]):  # Show first 5
+                print(f"[Dance LLM]   {i+1}. {kf['time']:.1f}s - {kf['pose']}")
+            if len(result["keyframes"]) > 5:
+                print(f"[Dance LLM]   ... and {len(result['keyframes']) - 5} more")
+            
             return result
             
         except json.JSONDecodeError as e:
-            print(f"[Dance] LLM JSON parse error: {e}")
-            print(f"[Dance] Response content: {response.choices[0].message.content if 'response' in locals() else 'N/A'}")
+            print(f"[Dance LLM] ✗ JSON parse error: {e}")
+            if 'response' in locals():
+                print(f"[Dance LLM] Response content: {response.choices[0].message.content[:200]}...")
+            print(f"[Dance LLM] Falling back to default dance")
             return self._get_fallback_dance()
         except Exception as e:
-            print(f"[Dance] LLM generation failed: {e}")
+            print(f"[Dance LLM] ✗ Generation failed: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
+            print(f"[Dance LLM] Falling back to default dance")
             return self._get_fallback_dance()
     
     def _get_fallback_dance(self) -> Dict[str, Any]:
         """Fallback dance plan when LLM fails."""
-        print("[Dance] Using fallback dance plan")
+        print("[Dance LLM] ⚠ Using fallback dance plan (7 keyframes, 12s)")
         return {
             "duration": 12.0,
             "keyframes": [
