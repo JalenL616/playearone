@@ -51,6 +51,12 @@ class WebSocketHandler:
         # Track speech duration per speaker per connection
         self.speech_start_time: Dict[tuple, Optional[float]] = {}  # (conn_id, speaker) -> start_time
         self.last_speech_time: Dict[tuple, float] = {}  # (conn_id, speaker) -> timestamp
+        
+        # Dance mode state (per connection)
+        self.dance_recording: Dict[int, bool] = {}
+        self.dance_buffers: Dict[int, list] = {}
+        self.dance_start_time: Dict[int, float] = {}
+        self.dance_expected_duration = 30.0  # seconds
 
     async def handle_connection(self, websocket: WebSocket) -> None:
         """Main handler for a WebSocket connection."""
@@ -132,6 +138,31 @@ class WebSocketHandler:
             self.buffers[conn_id] = AudioBuffer()
             await self._send_message(websocket, {"type": "listening_stopped"})
 
+        elif msg_type == "start_dance":
+            # Initialize dance recording
+            conn_id = id(websocket)
+            self.dance_recording[conn_id] = True
+            self.dance_buffers[conn_id] = []
+            self.dance_start_time[conn_id] = time.time()
+            
+            await self._send_message(websocket, {
+                "type": "dance_recording_started",
+                "duration": self.dance_expected_duration
+            })
+            
+            # Schedule dance processing after 30s
+            loop = asyncio.get_event_loop()
+            loop.call_later(
+                self.dance_expected_duration,
+                lambda: asyncio.create_task(self._process_dance(websocket, conn_id))
+            )
+        
+        elif msg_type == "cancel_dance":
+            # Allow user to cancel early
+            conn_id = id(websocket)
+            self._cleanup_dance_state(conn_id)
+            await self._send_message(websocket, {"type": "dance_cancelled"})
+
         elif msg_type == "ping":
             await self._send_message(websocket, {"type": "pong"})
 
@@ -145,6 +176,21 @@ class WebSocketHandler:
 
         if conn_id in self.enrollment_buffers:
             self.enrollment_buffers[conn_id].add_chunk(audio_bytes)
+        
+        # If dance recording active, save chunks
+        if self.dance_recording.get(conn_id, False):
+            # Convert bytes to numpy array
+            audio_array = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+            self.dance_buffers[conn_id].append(audio_array)
+            
+            # Send progress update every 5 seconds
+            elapsed = time.time() - self.dance_start_time[conn_id]
+            if int(elapsed) % 5 == 0 and elapsed > 0 and int(elapsed * 10) % 10 == 0:  # Once per 5s
+                await self._send_message(websocket, {
+                    "type": "dance_recording_progress",
+                    "elapsed": elapsed,
+                    "remaining": self.dance_expected_duration - elapsed
+                })
 
         # Process live audio when we have enough
         buffer = self.buffers.get(conn_id)
@@ -390,3 +436,138 @@ class WebSocketHandler:
             "type": "error",
             "message": error
         })
+    
+    async def _process_dance(self, websocket: WebSocket, conn_id: int) -> None:
+        """Process accumulated audio and generate dance plan."""
+        try:
+            if not self.dance_buffers.get(conn_id):
+                return
+            
+            # Send status update
+            await self._send_message(websocket, {
+                "type": "dance_status",
+                "message": "Transcribing your dance..."
+            })
+            
+            # Concatenate all audio chunks
+            full_audio = np.concatenate(self.dance_buffers[conn_id])
+            
+            # Transcribe using existing Vosk/Deepgram
+            print(f"[Dance] Transcribing {len(full_audio)/config.SAMPLE_RATE:.1f}s of audio")
+            transcript_start = time.time()
+            transcript = self.command_parser._transcribe(full_audio, config.SAMPLE_RATE)
+            transcript_time = time.time() - transcript_start
+            print(f"[Dance] Transcription complete: {transcript_time:.1f}s → '{transcript[:100]}...'")
+            
+            if not transcript or len(transcript.strip()) < 10:
+                await self._send_message(websocket, {
+                    "type": "dance_error",
+                    "message": "Could not understand the description. Please try again with clearer speech."
+                })
+                self._cleanup_dance_state(conn_id)
+                return
+            
+            # Generate dance plan with LLM
+            await self._send_message(websocket, {
+                "type": "dance_status",
+                "message": "Choreographing your moves..."
+            })
+            
+            dance_plan = await self._generate_dance_plan(transcript)
+            
+            # Send dance plan to frontend
+            await self._send_message(websocket, {
+                "type": "dance_plan",
+                "plan": dance_plan,
+                "transcript": transcript
+            })
+            
+            print(f"[Dance] Plan sent: {len(dance_plan['keyframes'])} keyframes over {dance_plan['duration']}s")
+            
+        except Exception as e:
+            print(f"[Dance] Error processing: {e}")
+            import traceback
+            traceback.print_exc()
+            await self._send_message(websocket, {
+                "type": "dance_error",
+                "message": f"Processing error: {str(e)}"
+            })
+        finally:
+            self._cleanup_dance_state(conn_id)
+    
+    async def _generate_dance_plan(self, transcript: str) -> Dict[str, Any]:
+        """Use LLM to convert transcript to structured dance plan."""
+        
+        prompt = f"""You are a creative dance choreographer. Convert the user's description into a structured dance sequence for a stick figure character.
+
+Available poses (angles in degrees):
+- IDLE: Standing neutral
+- ARMS_UP: Both arms raised overhead (90°)
+- ARMS_WAVE_LEFT: Left arm up (90°), right arm down (0°)
+- ARMS_WAVE_RIGHT: Right arm up (90°), left arm down (0°)
+- SPIN_LEFT: Body rotates left (-45°)
+- SPIN_RIGHT: Body rotates right (45°)
+- KICK_LEFT: Left leg extended (90°)
+- KICK_RIGHT: Right leg extended (90°)
+- JUMP: Both legs bent, body elevated
+- BOW: Body bent forward (-45°)
+
+User description: "{transcript}"
+
+Create a 12-second dance sequence with 8-15 keyframes. Be creative and match the user's description closely.
+
+Return ONLY valid JSON (no markdown, no explanation):
+{{
+  "duration": 12.0,
+  "keyframes": [
+    {{"time": 0.0, "pose": "IDLE"}},
+    {{"time": 2.0, "pose": "ARMS_UP"}},
+    {{"time": 4.0, "pose": "SPIN_LEFT"}},
+    ...
+  ]
+}}"""
+
+        try:
+            response = self.command_parser.client.chat.completions.create(
+                model=self.command_parser.model,
+                messages=[
+                    {"role": "system", "content": "You are a dance choreographer. Output only valid JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.8,  # More creative
+                response_format={"type": "json_object"}
+            )
+            
+            result = json.loads(response.choices[0].message.content)
+            
+            # Validate structure
+            if "duration" not in result or "keyframes" not in result:
+                raise ValueError("Invalid JSON structure")
+            
+            if len(result["keyframes"]) < 3:
+                raise ValueError("Too few keyframes")
+            
+            return result
+            
+        except Exception as e:
+            print(f"[Dance] LLM generation failed: {e}")
+            # Fallback: simple dance
+            return {
+                "duration": 12.0,
+                "keyframes": [
+                    {"time": 0.0, "pose": "IDLE"},
+                    {"time": 2.0, "pose": "ARMS_UP"},
+                    {"time": 4.0, "pose": "ARMS_WAVE_LEFT"},
+                    {"time": 6.0, "pose": "ARMS_WAVE_RIGHT"},
+                    {"time": 8.0, "pose": "SPIN_LEFT"},
+                    {"time": 10.0, "pose": "BOW"},
+                    {"time": 12.0, "pose": "IDLE"}
+                ]
+            }
+    
+    def _cleanup_dance_state(self, conn_id: int) -> None:
+        """Clean up dance recording state."""
+        self.dance_recording.pop(conn_id, None)
+        self.dance_buffers.pop(conn_id, None)
+        self.dance_start_time.pop(conn_id, None)

@@ -26,6 +26,7 @@
 
         <div class="tabs">
             <button class="tab active" data-tab="games">Game Arcade</button>
+            <button class="tab" data-tab="dance">AI Dance</button>
             <button class="tab" data-tab="live">Live Commands</button>
             <button class="tab" data-tab="enrollment">Speaker Enrollment</button>
             <button class="tab" data-tab="speakers">Enrolled Speakers</button>
@@ -59,6 +60,52 @@
                     <h3>GAME</h3>
                     <p>Some game</p>
                     <button class="btn secondary" disabled>Coming Soon</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dance Game Panel -->
+        <div class="panel" id="dancePanel">
+            <div class="dance-header">
+                <h2>🎭 AI Dance Choreographer</h2>
+                <p>Describe any dance and watch a stick figure perform it!</p>
+            </div>
+            
+            <div class="dance-controls">
+                <button id="startDance" class="btn primary">
+                    <span class="btn-icon">🎤</span>
+                    Create Dance (30s)
+                </button>
+                <button id="cancelDance" class="btn secondary" disabled>
+                    Cancel
+                </button>
+            </div>
+            
+            <div class="dance-status" id="danceStatus">
+                <div class="status-text">Ready to record</div>
+                <div class="status-timer" id="danceTimer"></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="danceProgress"></div>
+                </div>
+            </div>
+            
+            <canvas id="danceCanvas" width="800" height="600"></canvas>
+            
+            <div class="dance-transcript" id="danceTranscript"></div>
+            
+            <div class="dance-score" id="danceScore" style="display: none;">
+                <h3>Performance Score</h3>
+                <div class="score-item">
+                    <span>Creativity:</span>
+                    <span id="scoreCreativity">-</span>
+                </div>
+                <div class="score-item">
+                    <span>Energy:</span>
+                    <span id="scoreEnergy">-</span>
+                </div>
+                <div class="score-item">
+                    <span>Style:</span>
+                    <span id="scoreStyle">-</span>
                 </div>
             </div>
         </div>
@@ -121,5 +168,6 @@
     <script src="js/websocket.js"></script>
     <script src="js/enrollment.js"></script>
     <script src="js/display.js"></script>
+    <script src="js/dance.js"></script>
 </body>
 </html>
