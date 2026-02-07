@@ -20,6 +20,7 @@ A real-time voice command system that identifies speakers and extracts game comm
 ### 1. Accept Hugging Face Model Terms
 
 Go to the following page and accept the terms:
+
 - https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM
 
 ### 2. Get API Keys
