@@ -71,13 +71,13 @@ class Game {
       ball.y = ball.radius;
       ball.reverseY();
       // Sound: wall bounce
-      audioEngine.play_bounce(ball.x / canvas.width, ball.y / canvas.height);
+      audioEngine.play_bounce(ball.x / this.canvasWidth, ball.y / this.canvasHeight);
     }
     if (ball.y + ball.radius >= this.canvasHeight) {
       ball.y = this.canvasHeight - ball.radius;
       ball.reverseY();
       // Sound: wall bounce
-      audioEngine.play_bounce(ball.x / canvas.width, ball.y / canvas.height);
+      audioEngine.play_bounce(ball.x / this.canvasWidth, ball.y / this.canvasHeight);
     }
 
     // Ball-left paddle collision
@@ -93,7 +93,7 @@ class Game {
       ball.reverseX();
       ball.increaseDifficulty();
       // Sound: paddle hit
-      audioEngine.play_hit(ball.x / canvas.width, ball.y / canvas.height, ball.speed);
+      audioEngine.play_hit(ball.x / this.canvasWidth, ball.y / this.canvasHeight, ball.speed);
     }
 
     // Ball-right paddle collision
@@ -109,7 +109,7 @@ class Game {
       ball.reverseX();
       ball.increaseDifficulty();
       // Sound: paddle hit
-      audioEngine.play_hit(ball.x / canvas.width, ball.y / canvas.height, ball.speed);
+      audioEngine.play_hit(ball.x / this.canvasWidth, ball.y / this.canvasHeight, ball.speed);
     }
   }
 
@@ -117,7 +117,7 @@ class Game {
     if (this.ball.x - this.ball.radius < 0) {
       this.score2++;
       // Sound: score
-      audioEngine.play_score(2);
+      audioEngine.play_score(1);
       if (this.score2 >= WINNING_SCORE) {
         this.winner = 'Player 2';
         this.gameState = 'gameover';
@@ -131,7 +131,7 @@ class Game {
     if (this.ball.x + this.ball.radius > this.canvasWidth) {
       this.score1++;
       // Sound: score
-      audioEngine.play_score(1);
+      audioEngine.play_score(2);
       if (this.score1 >= WINNING_SCORE) {
         this.winner = 'Player 1';
         this.gameState = 'gameover';
