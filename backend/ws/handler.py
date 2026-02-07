@@ -1,5 +1,6 @@
 import json
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, asdict
@@ -36,6 +37,9 @@ class WebSocketHandler:
         self.identifier = SpeakerIdentifier(self.storage)
         self.command_parser = CommandParser()
         self.audio_processor = AudioProcessor()
+
+        # Thread pool for parallel processing
+        self.executor = ThreadPoolExecutor(max_workers=2)
 
         # Per-connection state
         self.buffers: Dict[int, AudioBuffer] = {}
@@ -183,8 +187,16 @@ class WebSocketHandler:
                 return True
         return False
 
+    def _identify_speaker(self, audio_tensor: torch.Tensor, sample_rate: int):
+        """Run speaker identification (for parallel execution)."""
+        return self.identifier.identify(audio_tensor, sample_rate)
+
+    def _parse_command(self, audio: np.ndarray, sample_rate: int):
+        """Run command parsing (for parallel execution)."""
+        return self.command_parser.parse(audio, sample_rate)
+
     def _process_audio_sync(self, audio: np.ndarray) -> Optional[CommandResult]:
-        """Synchronous audio processing (runs in thread pool)."""
+        """Synchronous audio processing with parallel speaker ID and transcription."""
         try:
             # Skip very silent audio
             if self._is_audio_silent(audio):
@@ -193,11 +205,17 @@ class WebSocketHandler:
             # Prepare audio for Pyannote
             audio_tensor, sample_rate = self.audio_processor.prepare_for_pyannote(audio)
 
-            # Identify speaker
-            speaker_match = self.identifier.identify(audio_tensor, sample_rate)
+            # Run speaker ID and command parsing in parallel
+            speaker_future = self.executor.submit(
+                self._identify_speaker, audio_tensor, sample_rate
+            )
+            command_future = self.executor.submit(
+                self._parse_command, audio, sample_rate
+            )
 
-            # Parse command
-            parsed = self.command_parser.parse(audio, sample_rate)
+            # Wait for both results
+            speaker_match = speaker_future.result()
+            parsed = command_future.result()
 
             # Filter only silence hallucinations
             if self._is_silence_hallucination(parsed.raw_text):

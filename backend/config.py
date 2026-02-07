@@ -6,7 +6,10 @@ load_dotenv()
 # OpenRouter API (or OpenAI API)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", os.getenv("OPENAI_API_KEY", ""))
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-4o")
+LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-4o-mini")
+
+# Deepgram API
+DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
 
 # Hugging Face token (required for Pyannote)
 HF_TOKEN = os.getenv("HF_TOKEN", "")

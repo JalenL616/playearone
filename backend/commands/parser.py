@@ -2,9 +2,11 @@ import json
 from typing import Optional
 from dataclasses import dataclass
 import numpy as np
-import whisper
+from deepgram import DeepgramClient, PrerecordedOptions
 from openai import OpenAI
 import config
+import io
+import wave
 
 
 @dataclass
@@ -16,7 +18,7 @@ class ParsedCommand:
 
 
 class CommandParser:
-    """Uses local Whisper for transcription and OpenRouter for command extraction."""
+    """Uses Deepgram for transcription and OpenRouter for command extraction."""
 
     def __init__(self):
         # OpenRouter client
@@ -27,41 +29,59 @@ class CommandParser:
         self.model = config.LLM_MODEL
         self.valid_commands = config.VALID_COMMANDS
 
-        # Local Whisper model (lazy loaded)
-        self._whisper_model = None
+        # Deepgram client
+        self.deepgram = DeepgramClient(config.DEEPGRAM_API_KEY)
 
-    def _load_whisper(self):
-        """Lazy load Whisper model."""
-        if self._whisper_model is None:
-            # Use "base" model for balance of speed/accuracy
-            # Options: tiny, base, small, medium, large
-            self._whisper_model = whisper.load_model("base")
-        return self._whisper_model
-
-    def _transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
-        """Transcribe audio using local Whisper."""
-        model = self._load_whisper()
-
-        # Whisper expects float32 audio normalized to [-1, 1]
+    def _audio_to_wav_bytes(self, audio: np.ndarray, sample_rate: int) -> bytes:
+        """Convert numpy audio array to WAV bytes for Deepgram."""
+        # Ensure float32 normalized to [-1, 1]
         if audio.dtype != np.float32:
             audio = audio.astype(np.float32)
 
-        # Ensure audio is normalized
         max_val = np.max(np.abs(audio))
         if max_val > 1.0:
             audio = audio / max_val
 
-        # Resample to 16kHz if needed (Whisper expects 16kHz)
-        if sample_rate != 16000:
-            # Simple resampling - for production use scipy.signal.resample
-            ratio = 16000 / sample_rate
-            new_length = int(len(audio) * ratio)
-            indices = np.linspace(0, len(audio) - 1, new_length)
-            audio = np.interp(indices, np.arange(len(audio)), audio).astype(np.float32)
+        # Convert to 16-bit PCM
+        audio_int16 = (audio * 32767).astype(np.int16)
 
-        # Transcribe
-        result = model.transcribe(audio, language="en", fp16=False)
-        return result.get("text", "").strip()
+        # Create WAV in memory
+        buffer = io.BytesIO()
+        with wave.open(buffer, 'wb') as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)  # 16-bit
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(audio_int16.tobytes())
+
+        return buffer.getvalue()
+
+    def _transcribe(self, audio: np.ndarray, sample_rate: int) -> str:
+        """Transcribe audio using Deepgram."""
+        try:
+            # Convert to WAV bytes
+            audio_bytes = self._audio_to_wav_bytes(audio, sample_rate)
+
+            # Deepgram options optimized for speed
+            options = PrerecordedOptions(
+                model="nova-2",
+                language="en",
+                smart_format=False,
+                punctuate=False,
+            )
+
+            # Transcribe
+            response = self.deepgram.listen.prerecorded.v("1").transcribe_file(
+                {"buffer": audio_bytes, "mimetype": "audio/wav"},
+                options
+            )
+
+            # Extract transcript
+            transcript = response.results.channels[0].alternatives[0].transcript
+            return transcript.strip()
+
+        except Exception as e:
+            print(f"Deepgram transcription error: {e}")
+            return ""
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt for command extraction."""
@@ -89,7 +109,7 @@ Examples:
     def parse(self, audio: np.ndarray, sample_rate: int) -> ParsedCommand:
         """
         Parse audio to extract command.
-        Uses local Whisper for transcription, then OpenRouter for command parsing.
+        Uses Deepgram for transcription, then OpenRouter for command parsing.
 
         Args:
             audio: Audio as numpy array (float32, normalized to [-1, 1])
@@ -99,7 +119,7 @@ Examples:
             ParsedCommand with extracted command details
         """
         try:
-            # Step 1: Transcribe with Whisper
+            # Step 1: Transcribe with Deepgram
             raw_text = self._transcribe(audio, sample_rate)
 
             if not raw_text:

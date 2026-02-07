@@ -32,8 +32,6 @@ ws_handler = WebSocketHandler()
 
 # Serve frontend static files
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
-if os.path.exists(frontend_path):
-    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 
 
 @app.get("/")
@@ -82,6 +80,10 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for audio streaming."""
     await ws_handler.handle_connection(websocket)
 
+
+# Mount frontend at root for static files (must be after all route definitions)
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn
