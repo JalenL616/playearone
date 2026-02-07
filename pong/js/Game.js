@@ -37,30 +37,21 @@ class Game {
     );
 
     initInput();
-    this.keyHandled = false;
-  }
-
-  isAnyKeyPressed() {
-    for (const key in keys) {
-      if (keys[key]) return true;
-    }
-    return false;
+    this.spaceHandled = false;
   }
 
   handleInput() {
-    const anyKey = this.isAnyKeyPressed();
+    if (keys[' ']) {
+      if (this.spaceHandled) return;
+      this.spaceHandled = true;
 
-    if (anyKey) {
-      if (this.keyHandled) return;
-      this.keyHandled = true;
-
-      if (this.gameState === 'waiting' && keys[' ']) {
+      if (this.gameState === 'waiting') {
         this.ball.reset(this.canvasWidth, this.canvasHeight);
         this.gameState = 'playing';
-      } else if (this.gameState === 'serving' && keys[' ']) {
+      } else if (this.gameState === 'serving') {
         this.ball.reset(this.canvasWidth, this.canvasHeight, this.serveDirection);
         this.gameState = 'playing';
-      } else if (this.gameState === 'playing' && keys[' ']) {
+      } else if (this.gameState === 'playing') {
         this.gameState = 'paused';
       } else if (this.gameState === 'paused') {
         this.gameState = 'playing';
@@ -68,7 +59,7 @@ class Game {
         this.reset();
       }
     } else {
-      this.keyHandled = false;
+      this.spaceHandled = false;
     }
   }
 
@@ -151,19 +142,22 @@ class Game {
     this.ball.dx = 0;
     this.ball.dy = 0;
     this.ball.speedMultiplier = 1;
+    this.resetPaddles();
     this.gameState = 'serving';
+  }
+
+  resetPaddles() {
+    const centerY = (this.canvasHeight - PADDLE_HEIGHT) / 2;
+    this.leftPaddle.y = centerY;
+    this.leftPaddle.velocity = 0;
+    this.rightPaddle.y = centerY;
+    this.rightPaddle.velocity = 0;
   }
 
   update() {
     this.handleInput();
 
-    // Allow paddle movement while serving
-    if (this.gameState === 'serving') {
-      this.leftPaddle.update(keys, this.canvasHeight);
-      this.rightPaddle.update(keys, this.canvasHeight);
-      return;
-    }
-
+    if (this.gameState === 'serving') return;
     if (this.gameState !== 'playing') return;
 
     this.leftPaddle.update(keys, this.canvasHeight);
@@ -178,8 +172,7 @@ class Game {
     this.score2 = 0;
     this.winner = '';
     this.ball.reset(this.canvasWidth, this.canvasHeight);
-    this.leftPaddle.y = (this.canvasHeight - PADDLE_HEIGHT) / 2;
-    this.rightPaddle.y = (this.canvasHeight - PADDLE_HEIGHT) / 2;
+    this.resetPaddles();
     this.gameState = 'waiting';
   }
 
