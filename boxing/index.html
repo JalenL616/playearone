@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Boxing</title>
+  <link rel="stylesheet" id="cssLink">
+  <script>
+    if (location.pathname === '/boxing') {
+      window.__basePath = '/boxing-static/';
+    } else {
+      window.__basePath = '';
+    }
+    document.getElementById('cssLink').href = window.__basePath + 'styles.css';
+  </script>
+</head>
+<body>
+  <div class="nav-header">
+    <a href="/" class="nav-btn">← Enroll Speakers</a>
+    <a href="/pong" class="nav-btn">Pong</a>
+  </div>
+  <div id="gameWrapper">
+    <div class="player-panel" id="player1Panel">
+      <div class="player-name" id="player1Name">Player 1</div>
+      <select class="player-select" id="player1Select">
+        <option value="">-- Select Speaker --</option>
+      </select>
+      <div class="player-command" id="player1Cmd"></div>
+    </div>
+    <div id="centerColumn">
+      <div id="voiceStatus">Voice: Connecting...</div>
+      <canvas id="gameCanvas"></canvas>
+    </div>
+    <div class="player-panel" id="player2Panel">
+      <div class="player-name" id="player2Name">Player 2</div>
+      <select class="player-select" id="player2Select">
+        <option value="">-- Select Speaker --</option>
+      </select>
+      <div class="player-command" id="player2Cmd"></div>
+    </div>
+  </div>
+
+  <script>
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = window.__basePath + src;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.body.appendChild(s);
+      });
+    }
+
+    (async () => {
+      const scripts = [
+        'js/constants.js', 'js/keybinds.js', 'js/Fighter.js', 'js/Renderer.js',
+        'js/Input.js', 'js/BoxingVoiceInput.js', 'js/Game.js'
+      ];
+      for (const src of scripts) {
+        await loadScript(src);
+      }
+    })();
+  </script>
+</body>
+</html>

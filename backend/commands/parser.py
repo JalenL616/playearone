@@ -190,6 +190,127 @@ Examples:
                     raw_text=raw_text,
                     confidence=0.85
                 )
+            
+            # Boxing commands
+            # "jab" often heard as "job", "ja", "jap"
+            if text_lower in ["job", "ja", "jap", "jabs", "jabbed"]:
+                return ParsedCommand(
+                    command="jab",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "cross" often heard as "crawss", "craw", "crosses"
+            if text_lower in ["crawss", "craw", "crosses", "crossed"]:
+                return ParsedCommand(
+                    command="cross",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "hook" often heard as "huk", "hooked"
+            if text_lower in ["huk", "hooked", "hooking", "hulk"]:
+                return ParsedCommand(
+                    command="hook",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "uppercut" often heard as "upper", "cut", "upperkat", "upcut"
+            if text_lower in ["upper", "cut", "upperkat", "upcut", "uppercuts"]:
+                return ParsedCommand(
+                    command="uppercut",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "block" often heard as "blog", "blocked", "box"
+            if text_lower in ["blog", "blocked", "blocking", "box", "bloc"]:
+                return ParsedCommand(
+                    command="block",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "guard" synonym for block
+            if text_lower in ["guard", "guarding", "guarded"]:
+                return ParsedCommand(
+                    command="guard",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "dodge" often heard as "doge", "dodged", "dok"
+            if text_lower in ["doge", "dodged", "dodging", "dok", "dogs"]:
+                return ParsedCommand(
+                    command="dodge",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "duck" synonym for dodge
+            if text_lower in ["duck", "ducked", "ducking", "ducks"]:
+                return ParsedCommand(
+                    command="duck",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "forward" often heard as "for", "towards"
+            if text_lower in ["for", "towards", "forwards", "forwarded"]:
+                return ParsedCommand(
+                    command="forward",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "advance" synonym for forward
+            if text_lower in ["advance", "advancing", "advanced", "advances"]:
+                return ParsedCommand(
+                    command="advance",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "back" often heard as "bak", "backwards"
+            if text_lower in ["bak", "backwards", "backing", "backed"]:
+                return ParsedCommand(
+                    command="back",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "retreat" synonym for back
+            if text_lower in ["retreat", "retreating", "retreated", "retreats"]:
+                return ParsedCommand(
+                    command="retreat",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "left" synonym for jab
+            if text_lower in ["left", "lefty", "lefts"]:
+                return ParsedCommand(
+                    command="left",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "right" synonym for cross
+            if text_lower in ["right", "righty", "rights"]:
+                return ParsedCommand(
+                    command="right",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
+            
+            # "fight" often heard as "fights", "fighting"
+            if text_lower in ["fights", "fighting", "fighter"]:
+                return ParsedCommand(
+                    command="fight",
+                    raw_text=raw_text,
+                    confidence=0.85
+                )
 
             # Step 3: Use LLM to parse more complex utterances
             response = self.client.chat.completions.create(

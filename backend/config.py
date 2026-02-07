@@ -28,8 +28,17 @@ ENROLLMENT_DURATION_SECONDS = 5
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 SPEAKERS_FILE = os.path.join(DATA_DIR, "speakers.json")
 
-# Valid commands (extensible)
-VALID_COMMANDS = ["up", "down", "start", "serve", "resume", "pause"]
+# Valid commands (superset for all games)
+VALID_COMMANDS = [
+    # Pong
+    "up", "down",
+    # Boxing
+    "jab", "cross", "hook", "uppercut", "upper",
+    "block", "guard", "dodge", "duck",
+    "forward", "back", "advance", "retreat", "left", "right",
+    # Shared
+    "start", "serve", "resume", "pause", "fight",
+]
 
 # Player assignments: speaker name → player number (1 = left, 2 = right)
 PLAYER_ASSIGNMENTS = {

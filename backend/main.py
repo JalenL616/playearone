@@ -113,7 +113,22 @@ async def pong():
     return {"error": "Pong not found"}
 
 
+# Serve Boxing game
+boxing_path = os.path.join(os.path.dirname(__file__), "..", "boxing")
+
+
+@app.get("/boxing")
+async def boxing():
+    """Serve the Boxing game."""
+    index_path = os.path.join(boxing_path, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"error": "Boxing not found"}
+
+
 # Mount static files (must be after all route definitions)
+if os.path.exists(boxing_path):
+    app.mount("/boxing-static", StaticFiles(directory=boxing_path), name="boxing")
 if os.path.exists(pong_path):
     app.mount("/pong-static", StaticFiles(directory=pong_path), name="pong")
 if os.path.exists(frontend_path):
