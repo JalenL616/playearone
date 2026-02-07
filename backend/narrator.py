@@ -20,7 +20,7 @@ class Narrator:
         
         # Choose a voice (En-US-GuyNeural is great for announcers)
         # You can see all voices via: edge-tts --list-voices
-        self.voice = "en-US-GuyNeural"
+        self.voice = "en-US-RogerNeural"
 
     def generate_commentary_text(self, speaker_name: str, action: str) -> Optional[str]:
         """Ask OpenRouter to generate a punchy commentary line."""
