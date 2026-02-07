@@ -69,20 +69,29 @@ Microphone → Browser → WebSocket → Backend → Speaker ID + Command Parse 
 ### 6. Command Recognition (Backend)
 
 **File:** `backend/commands/parser.py`
-**Models:** Deepgram Nova-2 (cloud) + OpenRouter LLM (fallback)
+**Models:** Vosk (local) or Deepgram (cloud) + OpenRouter LLM (fallback)
 
 Speaker identification and command recognition run **in parallel** via a `ThreadPoolExecutor`.
 
-**Stage A — Transcription (Deepgram)**
-- Audio is converted to WAV bytes and sent to the **Deepgram Nova-2** API for transcription
-- Returns a text transcript of the speech
+**Stage A — Transcription**
+- **Vosk (default):** Local speech recognition, 50-100ms, runs on CPU
+- **Deepgram (optional):** Cloud API, 150-300ms, requires API key
+- Audio converted to text transcript
 
-**Stage B — Command Extraction (fast path or LLM)**
-- **Fast path:** If the transcript exactly matches a valid command ("up", "down"), it returns immediately with 0.95 confidence — the LLM is skipped entirely
-- **Slow path:** If the transcript is more complex (e.g. "move the paddle up"), it's sent to an LLM via the OpenRouter API for command extraction
-- Valid commands are defined in `config.py`: `["up", "down"]`
+**Stage B — Command Extraction (3-stage fallback)**
+1. **Direct match:** If transcript exactly matches valid command ("up", "down") → return immediately with 0.95 confidence
+2. **Phonetic matching:** Check 150+ common misrecognitions ("yup" → "up", "blog" → "block", "dawn" → "down") + word-by-word scanning for multi-word transcripts
+3. **LLM fallback:** If no match, send to OpenRouter GPT-4o-mini for complex utterance parsing (only ~10% of commands reach this stage)
 
-**Silence filtering:** The handler checks RMS energy before processing and filters known hallucination phrases ("thank you", "subscribe", etc.)
+**Example Flow:**
+```
+Transcript: "the jab jab up down cross"
+→ Word scan finds "jab" (first valid command)
+→ Return ParsedCommand(command="jab", confidence=0.80)
+→ LLM never called (saves 500-800ms)
+```
+
+**Silence filtering:** Handler checks RMS energy before processing and filters known hallucination phrases
 
 ### 7. Response (Backend → Frontend)
 
@@ -165,8 +174,10 @@ User enters name → Clicks "Start Recording" → Speaks for 5 seconds → Backe
 │          ┌─────▼─────┐  ┌────▼──────┐        │
 │          │  Compare   │  │ Direct    │        │
 │          │  vs Enrolled│ │ match or  │        │
-│          │  Speakers  │  │ LLM parse │        │
-│          └─────┬──────┘  └────┬─────┘         │
+│          │  Speakers  │  │ Phonetic  │        │
+│          └─────┬──────┘  │ (150+) or │        │
+│                │         │ LLM parse │        │
+│                │         └────┬─────┘         │
 │                │              │                │
 │                └──────┬───────┘                │
 │                       │                       │
@@ -186,9 +197,9 @@ User enters name → Clicks "Start Recording" → Speaks for 5 seconds → Backe
 | Audio format | 16-bit PCM, mono | `config.py` |
 | Chunk duration | 500ms | `config.py` |
 | Enrollment duration | 5 seconds | `config.py` |
-| Speaker similarity threshold | 0.3 | `config.py` |
-| Valid commands | "up", "down" | `config.py` |
+| Speaker similarity threshold | 0.3 (general), 0.15 (active players) | `config.py` |
+| Valid commands | "up", "down", "jab", "cross", "hook", "uppercut", "block", "dodge", "forward", "back", etc. | `config.py` |
 | Speaker embedding model | Pyannote wespeaker-voxceleb-resnet34-LM | `enrollment.py` |
-| Transcription model | Deepgram Nova-2 (cloud) | `parser.py` |
-| Command extraction | Direct match, or OpenRouter LLM fallback | `parser.py` |
+| Transcription model | Vosk (local, default) or Deepgram Nova-2 (cloud) | `parser.py` |
+| Command extraction | Direct match → Phonetic (150+ variants) → LLM fallback | `parser.py` |
 | LLM model | openai/gpt-4o-mini via OpenRouter | `config.py` |
