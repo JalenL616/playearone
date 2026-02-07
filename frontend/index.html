@@ -11,7 +11,6 @@
         <header>
             <h1>PlayEarOne</h1>
             <p class="subtitle">Voice Command System</p>
-            <a href="/pong" class="play-pong-btn">🎮 Play Pong</a>
         </header>
 
         <div class="status-bar">
@@ -26,13 +25,40 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" data-tab="live">Live Commands</button>
+            <button class="tab active" data-tab="games">Game Arcade</button>
+            <button class="tab" data-tab="live">Live Commands</button>
             <button class="tab" data-tab="enrollment">Speaker Enrollment</button>
             <button class="tab" data-tab="speakers">Enrolled Speakers</button>
         </div>
 
+        <!-- 1. Game Arcade Panel -->
+        <div class="panel active" id="gamesPanel">
+            <div class="arcade-header">
+                <h2>Voice-Controlled Games</h2>
+                <p>Select a game. Your enrolled voice profile will be used for controls.</p>
+            </div>
+            
+            <div class="game-grid">
+                <!-- Pong -->
+                <div class="game-card">
+                    <div class="game-icon">🏓</div>
+                    <h3>Voice Pong</h3>
+                    <p>High-speed paddle action. Use "Up" and "Down" to move.</p>
+                    <a href="/pong" class="btn primary">Play Pong</a>
+                </div>
+
+                <!-- Future Game 1 -->
+                <div class="game-card locked">
+                    <div class="game-icon">🥊</div>
+                    <h3>BOXING</h3>
+                    <p>We love boxing.</p>
+                    <button class="btn secondary" disabled>Coming Soon</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Live Commands Panel -->
-        <div class="panel active" id="livePanel">
+        <div class="panel" id="livePanel">
             <div class="controls">
                 <button id="startListening" class="btn primary" disabled>Start Listening</button>
                 <button id="stopListening" class="btn secondary" disabled>Stop Listening</button>
