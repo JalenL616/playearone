@@ -542,7 +542,9 @@ class WebSocketHandler:
             return str(obj)
 
         try:
-            await websocket.send_text(json.dumps(message, default=self._json_default, default=default_converter))
+            await websocket.send_text(json.dumps(message, default=default_converter))
+        except Exception as e:
+            print(f"Websocket Send Error: {e}")
 
     @staticmethod
     def _json_default(obj):
@@ -554,8 +556,6 @@ class WebSocketHandler:
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
-        except Exception as e:
-            print(f"Websocket Send Error: {e}")
 
             
     async def _send_error(self, websocket: WebSocket, error: str) -> None:
