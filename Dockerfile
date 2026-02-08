@@ -7,7 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY . .
 
-RUN pip install --no-cache-dir -r backend/requirements.txt
+# Install CPU-only PyTorch first (much smaller than default GPU version)
+RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r backend/requirements.txt
 
 EXPOSE 8000
 
