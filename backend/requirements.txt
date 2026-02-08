@@ -19,3 +19,4 @@ vosk>=0.3.44
 # Utilities
 python-dotenv>=1.0.0
 openai>=1.30.0
+huggingface_hub
